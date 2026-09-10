@@ -1,0 +1,16 @@
+### :sparkles: Features
+
+- config: derive tag format from product (bbb2222)
+- add the check subcommand (eee5555)
+
+### :bug: Fixes
+
+- parser: keep multi-line bodies (ccc3333)
+
+### :memo: Documentation
+
+- explain the loop guards (ddd4444)
+
+### :wrench: Chores
+
+- tidy up (aaa1111)

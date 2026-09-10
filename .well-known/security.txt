@@ -1,0 +1,9 @@
+Contact: mailto:security@ole-hartwig.eu
+Contact: https://git.ole-hartwig.eu/devops/security-policy/-/issues/new
+Expires: 2027-12-31T23:59:59.000Z
+Encryption: https://ole-hartwig.eu/.well-known/openpgpkey
+Acknowledgments: https://ole-hartwig.eu/security/hall-of-fame
+Preferred-Languages: de, en
+Canonical: https://ole-hartwig.eu/.well-known/security.txt
+Policy: https://ole-hartwig.eu/security
+CSAF: https://ole-hartwig.eu/.well-known/csaf-provider-metadata.json

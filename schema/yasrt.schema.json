@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://git.ole-hartwig.eu/devops/yasrt/-/raw/main/schema/yasrt.schema.json",
+  "title": ".yasrt.yaml",
+  "description": "Configuration for yasrt. Every field is optional except product.",
+  "type": "object",
+  "required": ["product"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "integer", "enum": [1], "default": 1 },
+    "product": {
+      "description": "What this repository ships. Derives non_release_paths and tag_format.",
+      "type": "string",
+      "enum": ["image", "package", "extension", "custom"]
+    },
+    "tag_format": {
+      "description": "Tag template. Defaults to ${version} for image and custom, v${version} for package and extension.",
+      "type": "string",
+      "pattern": "\\$\\{version\\}"
+    },
+    "versioning": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "initial": {
+          "description": "Version of the first release, when no tag exists.",
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+",
+          "default": "1.0.0"
+        },
+        "major_on_zero": {
+          "description": "When false, a breaking change below 1.0.0 bumps the minor version instead.",
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "rules": {
+      "description": "First matching rule wins per commit; the highest bump across commits wins overall.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "anyOf": [
+          { "required": ["type"] },
+          { "required": ["scope"] },
+          { "required": ["breaking"] }
+        ],
+        "properties": {
+          "type": { "type": "string" },
+          "scope": { "type": "string" },
+          "breaking": { "type": "boolean" },
+          "release": { "type": "string", "enum": ["major", "minor", "patch", "none", ""] }
+        }
+      }
+    },
+    "ignore": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scopes": {
+          "description": "Commit scopes that never release. `release` is always present and cannot be removed.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "authors": {
+          "description": "Matches the author name, the full address, or the local part of the address.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "trailers": {
+          "description": "Markers such as [skip release] in the body, or a matching footer token.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "deliverability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "non_release_paths": {
+          "description": "Replaces the list derived from product entirely. Required when product is custom.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "extra_non_release_paths": {
+          "description": "Extends whichever list applies.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "changelog": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "file": { "type": "string", "default": "CHANGELOG.md" },
+        "sections": {
+          "description": "Rendered in this order; empty sections are omitted.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "title"],
+            "additionalProperties": false,
+            "properties": {
+              "type": { "type": "string" },
+              "title": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "release_commit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "message": { "type": "string", "default": "chore(release): ${version}" },
+        "assets": { "type": "array", "items": { "type": "string" } },
+        "sign": {
+          "description": "auto signs when a key is present; required fails before anything is pushed; off never signs.",
+          "type": "string",
+          "enum": ["auto", "required", "off"],
+          "default": "auto"
+        },
+        "author": { "type": "string", "examples": ["release-bot <release-bot@example.invalid>"] }
+      }
+    },
+    "gitlab_release": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "name": { "type": "string", "default": "${version}" },
+        "assets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "url"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "link_type": { "type": "string", "enum": ["other", "runbook", "image", "package"] }
+            }
+          }
+        }
+      }
+    },
+    "after_release": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "triggers": {
+          "description": "Follow-up pipelines. Failures are logged and never fail the release.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["project", "ref"],
+            "additionalProperties": false,
+            "properties": {
+              "project": { "type": "string" },
+              "ref": { "type": "string" },
+              "variables": { "type": "object", "additionalProperties": { "type": "string" } }
+            }
+          }
+        }
+      }
+    }
+  }
+}

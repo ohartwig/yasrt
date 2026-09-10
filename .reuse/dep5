@@ -1,0 +1,8 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: yasrt
+Upstream-Contact: Kai Ole Hartwig <info@ole-hartwig.eu>
+Source: https://git.ole-hartwig.eu/devops/yasrt
+
+Files: *
+Copyright: 2026 Kai Ole Hartwig
+License: Apache-2.0

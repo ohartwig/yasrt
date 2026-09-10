@@ -1,0 +1,36 @@
+# yasrt lint configuration.
+#
+# No repository in this estate had a .golangci.yml when yasrt was written, so
+# this is a starting position rather than an inherited convention: the default
+# linters, plus the few that catch the mistakes this codebase can actually
+# make — unchecked errors around git and HTTP, and shadowed error values.
+# See docs/plan.md risk R7 before promoting it to the shared Go component.
+
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - errorlint
+    - misspell
+    - nilerr
+    - unconvert
+    - usestdlibvars
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+    govet:
+      enable:
+        - shadow
+
+  exclusions:
+    rules:
+      # Tests deliberately ignore errors from helpers that already t.Fatal.
+      - path: _test\.go
+        linters: [errcheck]
+
+formatters:
+  enable:
+    - gofmt

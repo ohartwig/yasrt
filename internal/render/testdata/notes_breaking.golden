@@ -1,0 +1,16 @@
+### :boom: BREAKING CHANGES
+
+- drop the preset mode
+- .releaserc.yml is no longer read
+
+### :sparkles: Features
+
+- drop the preset mode (aaa1111)
+
+### :bug: Fixes
+
+- unrelated fix (bbb2222)
+
+### :zap: Refactor
+
+- rework loader (ccc3333)

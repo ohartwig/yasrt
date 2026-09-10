@@ -1,0 +1,149 @@
+# yasrt releases itself with yasrt (docs/plan.md, P6).
+#
+# Note the stage order: version -> build -> release. The tag is cut *after* the
+# artefacts exist, which is the whole point of this tool. It also has to be
+# this way here: pushes made with CI_JOB_TOKEN do not start pipelines, so a
+# tag-triggered build would never run. Image repositories migrating to yasrt
+# have to make the same move — see docs/plan.md risk R8.
+stages: [quick, test, version, build, release, sign]
+
+variables:
+  GIT_DEPTH: 0
+  GIT_STRATEGY: clone
+  GO_IMAGE: registry.ole-hartwig.eu/devops/images/golang:1.27
+  GOTOOLCHAIN: local
+  GOFLAGS: -mod=readonly
+  GOPATH: ${CI_PROJECT_DIR}/.go
+
+include:
+  - component: ${CI_SERVER_HOST}/devops/ci-cd-components/composed-default-pipelines/go@1
+    inputs:
+      working-directory: .
+      go-image: registry.ole-hartwig.eu/devops/images/golang:1.27
+      test-args: "-race -coverprofile=coverage.out ./..."
+  - component: ${CI_SERVER_HOST}/devops/ci-cd-components/lint-tools/lint-ci-yaml@1
+    inputs:
+      stage: "test"
+      job-name: "lint:ci-yaml"
+      targets: ".gitlab-ci.yml"
+  - component: ${CI_SERVER_HOST}/devops/ci-cd-components/supply-chain-verify/base-image-pins@2
+
+.go-base: &go-base
+  image: $GO_IMAGE
+  cache:
+    key:
+      files: [go.sum]
+    paths: [.go/pkg/mod]
+
+# yasrt has no golangci-lint or govulncheck precedent in this estate to inherit;
+# both are introduced here rather than in the shared Go component, so the two
+# other Go consumers are not affected. See docs/plan.md R7.
+lint:golangci:
+  <<: *go-base
+  stage: test
+  script:
+    - go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.6.2 run --timeout 5m
+  allow_failure: true
+
+# The estate's stated gate is 75 % line coverage (engineering/quality-gates.md).
+# It is expressed there for PHP via Cobertura; Go reports through GitLab's
+# coverage: regex instead, so the threshold is enforced here explicitly.
+test:coverage:gate:
+  <<: *go-base
+  stage: test
+  needs: []
+  variables:
+    COVERAGE_MINIMUM: "75.0"
+  script:
+    - go test -coverprofile=coverage.out ./...
+    - go tool cover -func=coverage.out | tail -1
+    - |
+      total="$(go tool cover -func=coverage.out | awk '/^total:/ {gsub(/%/,"",$3); print $3}')"
+      echo "total coverage ${total}% (minimum ${COVERAGE_MINIMUM}%)"
+      awk -v t="$total" -v m="$COVERAGE_MINIMUM" 'BEGIN { exit (t+0 >= m+0) ? 0 : 1 }'
+  coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
+  artifacts:
+    paths: [coverage.out]
+    expire_in: 7 days
+
+test:govulncheck:
+  <<: *go-base
+  stage: test
+  script:
+    - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+# ---------------------------------------------------------------------------
+# The release handshake.
+# ---------------------------------------------------------------------------
+
+version:
+  <<: *go-base
+  stage: version
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+  script:
+    - go run ./cmd/yasrt next --output .release.env
+  artifacts:
+    reports:
+      dotenv: .release.env
+    expire_in: 1 day
+
+# GitLab evaluates rules: at pipeline creation, before .release.env exists, so
+# downstream jobs check RELEASE_STATUS in the script rather than in rules:.
+.needs-release: &needs-release
+  - '[ "$RELEASE_STATUS" = "release" ] || { echo "skip: ${RELEASE_STATUS:-unknown}"; exit 0; }'
+
+build:binaries:
+  <<: *go-base
+  stage: build
+  needs: [version]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+  script:
+    - *needs-release
+    - mkdir -p dist
+    - |
+      for arch in amd64 arm64; do
+        CGO_ENABLED=0 GOOS=linux GOARCH="$arch" \
+          go build -trimpath -ldflags "-s -w -X main.version=${RELEASE_VERSION}" \
+          -o "dist/yasrt-linux-${arch}" ./cmd/yasrt
+      done
+    - cd dist && sha256sum yasrt-linux-* > SHA256SUMS && cat SHA256SUMS
+  artifacts:
+    paths: [dist/]
+    expire_in: 1 day
+
+upload:package-registry:
+  stage: build
+  needs: [version, build:binaries]
+  image: registry.ole-hartwig.eu/devops/ci-mirrors/curl:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+  variables:
+    PACKAGE_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/yasrt"
+  script:
+    - *needs-release
+    # release-cli is deliberately unused: its image lives on an IPv4-only host
+    # the runners cannot reach. The API does the same job, and curl is here.
+    - cd dist
+    - |
+      for f in yasrt-linux-amd64 yasrt-linux-arm64 SHA256SUMS; do
+        curl --fail-with-body --silent --show-error \
+          --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+          --upload-file "$f" "${PACKAGE_URL}/${RELEASE_VERSION}/${f}"
+      done
+
+release:
+  <<: *go-base
+  stage: release
+  needs: [version, build:binaries, upload:package-registry]
+  resource_group: release
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+  script:
+    - *needs-release
+    - go run ./cmd/yasrt release
+  artifacts:
+    paths: [release-report.json]
+    when: always
+    expire_in: 30 days

@@ -1,0 +1,27 @@
+# yasrt releases yasrt. See docs/plan.md, phase P6.
+version: 1
+
+# custom rather than image: this repository ships a binary to the package
+# registry *and* an image, and its own pipeline is part of neither.
+product: custom
+
+deliverability:
+  non_release_paths:
+    - CHANGELOG.md
+    - README.md
+    - CONTRIBUTING.md
+    - CODE_OF_CONDUCT.md
+    - SECURITY.md
+    - docs/**
+    - lefthook.yml
+    - .gitlab/**
+
+release_commit:
+  enabled: true
+  message: "chore(release): ${version}"
+  assets: [CHANGELOG.md]
+  sign: auto
+
+gitlab_release:
+  enabled: true
+  name: "${version}"

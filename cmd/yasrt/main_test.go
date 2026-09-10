@@ -1,0 +1,300 @@
+// SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
+// SPDX-License-Identifier: Apache-2.0
+
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"git.ole-hartwig.eu/devops/yasrt/internal/output"
+	"git.ole-hartwig.eu/devops/yasrt/internal/testrepo"
+)
+
+// fixture builds a repository with a config file and returns paths for --dir
+// and --config, so no test has to change the working directory.
+type fixture struct {
+	tr      *testrepo.Repo
+	cfgPath string
+	envPath string
+}
+
+func newFixture(t *testing.T, cfg string) *fixture {
+	t.Helper()
+	tr := testrepo.New(t)
+	tr.Write(".yasrt.yaml", cfg)
+	tr.Git("add", "-A")
+	tr.Git("commit", "-q", "-m", "chore: configuration")
+	return &fixture{
+		tr:      tr,
+		cfgPath: filepath.Join(tr.Dir, ".yasrt.yaml"),
+		envPath: filepath.Join(t.TempDir(), ".release.env"),
+	}
+}
+
+func (f *fixture) next(args ...string) int {
+	return run(append([]string{"next", "--dir", f.tr.Dir, "--config", f.cfgPath}, args...))
+}
+
+func (f *fixture) release(args ...string) int {
+	return run(append([]string{"release", "--dir", f.tr.Dir, "--config", f.cfgPath}, args...))
+}
+
+func (f *fixture) check(args ...string) int {
+	return run(append([]string{"check", "--dir", f.tr.Dir, "--config", f.cfgPath}, args...))
+}
+
+func TestUsageAndVersion(t *testing.T) {
+	if got := run(nil); got != exitUsage {
+		t.Errorf("no arguments = %d, want %d", got, exitUsage)
+	}
+	if got := run([]string{"definitely-not-a-command"}); got != exitUsage {
+		t.Errorf("unknown command = %d", got)
+	}
+	if got := run([]string{"version"}); got != exitOK {
+		t.Errorf("version = %d", got)
+	}
+	if got := run([]string{"help"}); got != exitOK {
+		t.Errorf("help = %d", got)
+	}
+}
+
+func TestNextWritesTheHandshake(t *testing.T) {
+	f := newFixture(t, "product: image\n")
+	f.tr.CommitFile("src/main.go", "1", "feat: something shippable")
+
+	if got := f.next("--output", f.envPath); got != exitOK {
+		t.Fatalf("exit = %d", got)
+	}
+	kv, err := output.ReadDotenv(f.envPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kv[output.KeyStatus] != "release" || kv[output.KeyVersion] != "1.0.0" {
+		t.Errorf("handshake = %+v", kv)
+	}
+}
+
+// The documented exit codes are a public interface: consumer pipelines and the
+// component's own script switch on them.
+func TestExitCodes(t *testing.T) {
+	t.Run("no-bump is 3 only with --fail-on-skip", func(t *testing.T) {
+		f := newFixture(t, "product: image\n")
+		f.tr.CommitFile("src/main.go", "1", "feat: first")
+		f.tr.Tag("1.0.0")
+		f.tr.CommitFile("src/main.go", "2", "style: reformat")
+
+		if got := f.next(); got != exitOK {
+			t.Errorf("without the flag the analysis still succeeded: %d", got)
+		}
+		if got := f.next("--fail-on-skip"); got != exitNoBump {
+			t.Errorf("exit = %d, want %d", got, exitNoBump)
+		}
+	})
+
+	t.Run("not-deliverable is 4", func(t *testing.T) {
+		f := newFixture(t, "product: image\n")
+		f.tr.CommitFile("src/main.go", "1", "feat: first")
+		f.tr.Tag("1.0.0")
+		f.tr.CommitFile("docs/guide.md", "d", "feat: document it")
+
+		if got := f.next("--fail-on-skip"); got != exitNotDeliverable {
+			t.Errorf("exit = %d, want %d", got, exitNotDeliverable)
+		}
+	})
+
+	t.Run("bad arguments are 2", func(t *testing.T) {
+		f := newFixture(t, "product: image\n")
+		f.tr.CommitFile("src/main.go", "1", "feat: first")
+		f.tr.Tag("2.0.0")
+		f.tr.CommitFile("src/b.go", "2", "fix: second")
+
+		if got := f.next("--version", "1.0.0"); got != exitUsage {
+			t.Errorf("a lower --version = %d, want %d", got, exitUsage)
+		}
+		if got := f.next("--force", "enormous"); got != exitUsage {
+			t.Errorf("an invalid --force = %d, want %d", got, exitUsage)
+		}
+		if got := f.next("--force", "minor", "--version", "3.0.0"); got != exitUsage {
+			t.Errorf("mutually exclusive flags = %d, want %d", got, exitUsage)
+		}
+		if got := f.next("--nonexistent-flag"); got != exitUsage {
+			t.Errorf("unknown flag = %d", got)
+		}
+		if got := f.next("stray-argument"); got != exitUsage {
+			t.Errorf("stray argument = %d", got)
+		}
+	})
+
+	t.Run("missing config is 1", func(t *testing.T) {
+		tr := testrepo.New(t)
+		tr.CommitFile("src/main.go", "1", "feat: first")
+		if got := run([]string{"next", "--dir", tr.Dir, "--config", filepath.Join(tr.Dir, "absent.yaml")}); got != exitError {
+			t.Errorf("exit = %d, want %d", got, exitError)
+		}
+	})
+
+	t.Run("shallow clone is 1", func(t *testing.T) {
+		f := newFixture(t, "product: image\n")
+		f.tr.CommitFile("a.go", "1", "feat: one")
+		f.tr.CommitFile("b.go", "2", "feat: two")
+		shallow := f.tr.Clone(1)
+		if got := run([]string{"next", "--dir", shallow.Dir, "--config", f.cfgPath}); got != exitError {
+			t.Errorf("exit = %d, want %d", got, exitError)
+		}
+	})
+}
+
+// Someone pushed between the analysis and the release: exit 5, nothing written.
+func TestReleaseConflictIsExit5(t *testing.T) {
+	f := newFixture(t, "product: image\n")
+	f.tr.CommitFile("src/main.go", "1", "feat: first")
+	f.tr.WithRemote()
+
+	if got := f.next("--output", f.envPath); got != exitOK {
+		t.Fatalf("next = %d", got)
+	}
+	f.tr.CommitFile("src/b.go", "2", "feat: pushed in the meantime")
+
+	got := f.release("--input", f.envPath, "--report", filepath.Join(t.TempDir(), "r.json"))
+	if got != exitConflict {
+		t.Errorf("exit = %d, want %d", got, exitConflict)
+	}
+	if tags := f.tr.RemoteTags(); len(tags) != 0 {
+		t.Errorf("nothing should have been pushed, got %q", tags)
+	}
+}
+
+func TestReleaseRefusesWhenTheHandshakeSaysNo(t *testing.T) {
+	f := newFixture(t, "product: image\n")
+	f.tr.CommitFile("src/main.go", "1", "feat: first")
+	f.tr.Tag("1.0.0")
+	f.tr.CommitFile("src/main.go", "2", "style: reformat")
+	f.tr.WithRemote()
+
+	if got := f.next("--output", f.envPath); got != exitOK {
+		t.Fatalf("next = %d", got)
+	}
+	if got := f.release("--input", f.envPath, "--report", filepath.Join(t.TempDir(), "r.json")); got != exitError {
+		t.Errorf("exit = %d, want %d", got, exitError)
+	}
+}
+
+func TestReleaseDryRunWritesNothing(t *testing.T) {
+	f := newFixture(t, "product: image\n")
+	f.tr.CommitFile("src/main.go", "1", "feat: first")
+	f.tr.WithRemote()
+
+	if got := f.next("--output", f.envPath); got != exitOK {
+		t.Fatalf("next = %d", got)
+	}
+	if got := f.release("--input", f.envPath, "--dry-run"); got != exitOK {
+		t.Fatalf("release = %d", got)
+	}
+	if tags := f.tr.RemoteTags(); len(tags) != 0 {
+		t.Errorf("dry run pushed %q", tags)
+	}
+	if f.tr.Exists("CHANGELOG.md") {
+		t.Error("dry run wrote the changelog")
+	}
+}
+
+func TestFullHandshakeAndRelease(t *testing.T) {
+	f := newFixture(t, "product: image\n")
+	f.tr.CommitFile("src/main.go", "1", "feat: first release")
+	f.tr.WithRemote()
+
+	if got := f.next("--output", f.envPath); got != exitOK {
+		t.Fatalf("next = %d", got)
+	}
+	report := filepath.Join(t.TempDir(), "release-report.json")
+	if got := f.release("--input", f.envPath, "--report", report); got != exitOK {
+		t.Fatalf("release = %d", got)
+	}
+
+	if tags := f.tr.RemoteTags(); len(tags) != 1 || tags[0] != "1.0.0" {
+		t.Errorf("remote tags = %q", tags)
+	}
+	if !strings.Contains(f.tr.Read("CHANGELOG.md"), "## [1.0.0]") {
+		t.Errorf("changelog:\n%s", f.tr.Read("CHANGELOG.md"))
+	}
+	b, err := os.ReadFile(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"tag":"1.0.0"`) {
+		t.Errorf("report = %s", b)
+	}
+}
+
+// The handshake also arrives as environment variables, because that is how a
+// GitLab dotenv report reaches a later job.
+func TestReleaseReadsTheHandshakeFromTheEnvironment(t *testing.T) {
+	f := newFixture(t, "product: image\n")
+	f.tr.CommitFile("src/main.go", "1", "feat: first release")
+	f.tr.WithRemote()
+
+	if got := f.next("--output", f.envPath); got != exitOK {
+		t.Fatalf("next = %d", got)
+	}
+	kv, err := output.ReadDotenv(f.envPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for k, v := range kv {
+		t.Setenv(k, v)
+	}
+
+	// --input names a file that does not exist, so only the environment is left.
+	got := f.release("--input", filepath.Join(t.TempDir(), "absent.env"),
+		"--report", filepath.Join(t.TempDir(), "r.json"))
+	if got != exitOK {
+		t.Fatalf("release = %d", got)
+	}
+	if tags := f.tr.RemoteTags(); len(tags) != 1 {
+		t.Errorf("remote tags = %q", tags)
+	}
+}
+
+func TestCheck(t *testing.T) {
+	t.Run("healthy repository", func(t *testing.T) {
+		f := newFixture(t, "product: image\n")
+		f.tr.CommitFile("src/main.go", "1", "feat: first")
+		f.tr.WithRemote()
+		t.Setenv("CI_JOB_TOKEN", "pretend-token")
+		if got := f.check(); got != exitOK {
+			t.Errorf("exit = %d", got)
+		}
+	})
+
+	t.Run("invalid configuration fails", func(t *testing.T) {
+		f := newFixture(t, "product: chart\n")
+		f.tr.CommitFile("src/main.go", "1", "feat: first")
+		if got := f.check(); got != exitError {
+			t.Errorf("exit = %d, want %d", got, exitError)
+		}
+	})
+
+	t.Run("shallow clone is reported", func(t *testing.T) {
+		f := newFixture(t, "product: image\n")
+		f.tr.CommitFile("a.go", "1", "feat: one")
+		f.tr.CommitFile("b.go", "2", "feat: two")
+		shallow := f.tr.Clone(1)
+		t.Setenv("CI_JOB_TOKEN", "pretend-token")
+		if got := run([]string{"check", "--dir", shallow.Dir, "--config", f.cfgPath}); got != exitError {
+			t.Errorf("exit = %d, want %d", got, exitError)
+		}
+	})
+
+	t.Run("json output", func(t *testing.T) {
+		f := newFixture(t, "product: image\n")
+		f.tr.CommitFile("src/main.go", "1", "feat: first")
+		f.tr.WithRemote()
+		t.Setenv("CI_JOB_TOKEN", "pretend-token")
+		if got := f.check("--json"); got != exitOK {
+			t.Errorf("exit = %d", got)
+		}
+	})
+}

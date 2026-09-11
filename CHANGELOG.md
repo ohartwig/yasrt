@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.0] - 2026-09-11
+
+### :sparkles: Features
+
+- publish to GitHub and Forgejo as well as GitLab (e980fb6)
+
 ## [1.4.0] - 2026-09-11
 
 ### :sparkles: Features

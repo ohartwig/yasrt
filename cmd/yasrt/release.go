@@ -12,8 +12,8 @@ import (
 
 	"git.ole-hartwig.eu/yasrt/cli/internal/analyze"
 	"git.ole-hartwig.eu/yasrt/cli/internal/config"
+	"git.ole-hartwig.eu/yasrt/cli/internal/forge"
 	"git.ole-hartwig.eu/yasrt/cli/internal/git"
-	"git.ole-hartwig.eu/yasrt/cli/internal/gitlab"
 	"git.ole-hartwig.eu/yasrt/cli/internal/output"
 	"git.ole-hartwig.eu/yasrt/cli/internal/release"
 	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
@@ -27,6 +27,7 @@ func cmdRelease(args []string) error {
 		remote     string
 		branch     string
 		gpgVar     string
+		forgeKind  string
 		dryRun     bool
 		dir        string
 	)
@@ -35,8 +36,10 @@ func cmdRelease(args []string) error {
 	fs.StringVar(&input, "input", ".release.env", "dotenv file produced by `yasrt next`")
 	fs.StringVar(&reportPath, "report", "release-report.json", "where to write the run report")
 	fs.StringVar(&remote, "remote", "origin", "git remote to push to")
-	fs.StringVar(&branch, "branch", envOr("CI_DEFAULT_BRANCH", ""), "branch for the release commit")
+	fs.StringVar(&branch, "branch", "", "branch for the release commit; taken from the CI environment when empty")
 	fs.StringVar(&gpgVar, "gpg-key-var", "GPG_SEM_REL_B64", "environment variable holding the base64 signing key")
+	fs.StringVar(&forgeKind, "forge", os.Getenv("YASRT_FORGE"),
+		"gitlab, github or forgejo; detected from the CI environment when empty")
 	fs.BoolVar(&dryRun, "dry-run", false, "render everything, write nothing")
 	fs.StringVar(&dir, "dir", ".", "repository directory")
 	fs.Usage = func() {
@@ -47,8 +50,12 @@ func cmdRelease(args []string) error {
 		return err
 	}
 
-	token := os.Getenv("CI_JOB_TOKEN")
+	env, detected := forge.Detect(forge.OSGetenv)
+	token := env.Token
 	log := common.logger(token, os.Getenv(gpgVar))
+	if !detected && forgeKind == "" {
+		log.Warn("no CI environment recognised; pass --forge to say where this release is published")
+	}
 
 	cfg, err := config.LoadLayered(common.layers(), common.config)
 	if err != nil {
@@ -59,32 +66,36 @@ func cmdRelease(args []string) error {
 		return err
 	}
 
+	if branch == "" {
+		branch = env.DefaultBranch
+	}
+
 	res, err := loadResult(repo, cfg, input, log)
 	if err != nil {
 		return err
 	}
 
-	var client *gitlab.Client
-	apiURL, projectID := os.Getenv("CI_API_V4_URL"), os.Getenv("CI_PROJECT_ID")
-	if apiURL != "" && projectID != "" && token != "" {
-		client = gitlab.New(apiURL, projectID, token)
+	client, env, err := forge.New(env, forgeKind)
+	if err != nil {
+		log.Warn("no forge credentials in the environment; skipping the publishing steps", "err", err)
+		client = nil
 	} else {
-		log.Warn("no GitLab API credentials in the environment; skipping the release and trigger steps",
-			"have_api_url", apiURL != "", "have_project_id", projectID != "", "have_token", token != "")
+		log.Info("publishing to", "forge", string(client.Kind()), "repo", env.Repo)
 	}
+	urls := forge.URLs{Kind: env.Kind, Base: env.ProjectURL}
 
 	rep, runErr := release.Run(context.Background(), release.Options{
-		Repo:       repo,
-		Config:     cfg,
-		Result:     res,
-		Client:     client,
-		Remote:     remote,
-		Branch:     branch,
-		Token:      token,
-		ProjectURL: os.Getenv("CI_PROJECT_URL"),
-		GPGKeyB64:  os.Getenv(gpgVar),
-		DryRun:     dryRun,
-		Log:        log,
+		Repo:      repo,
+		Config:    cfg,
+		Result:    res,
+		Forge:     client,
+		URLs:      urls,
+		Remote:    remote,
+		Branch:    branch,
+		Token:     token,
+		GPGKeyB64: os.Getenv(gpgVar),
+		DryRun:    dryRun,
+		Log:       log,
 	})
 
 	// The report is written even on failure: it is how a human sees how far the

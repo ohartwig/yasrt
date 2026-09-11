@@ -199,6 +199,7 @@
           "description": "Release-commit subject. ${version} and ${tag} are substituted."
         },
         "assets": {
+          "description": "Links attached to the release. GitLab attaches them as release links; GitHub and Forgejo have no such endpoint, so they are appended to the release body as an Assets list.",
           "type": "array",
           "items": {
             "type": "string"
@@ -224,6 +225,7 @@
       }
     },
     "gitlab_release": {
+      "description": "The release object on the forge. Named for GitLab, where it started; the same block publishes to GitHub and Forgejo, which yasrt detects from the job environment.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -237,6 +239,7 @@
           "description": "Release name. ${version} and ${tag} are substituted."
         },
         "assets": {
+          "description": "Links attached to the release. GitLab attaches them as release links; GitHub and Forgejo have no such endpoint, so they are appended to the release body as an Assets list.",
           "type": "array",
           "items": {
             "type": "object",
@@ -271,7 +274,7 @@
       "additionalProperties": false,
       "properties": {
         "triggers": {
-          "description": "Follow-up pipelines. Failures are logged and never fail the release.",
+          "description": "Follow-up pipelines via the GitLab trigger API. Failures are logged and never fail the release. On GitHub and Forgejo every trigger is reported as undeliverable.",
           "type": "array",
           "items": {
             "type": "object",

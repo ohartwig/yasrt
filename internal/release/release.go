@@ -26,8 +26,8 @@ import (
 
 	"git.ole-hartwig.eu/yasrt/cli/internal/analyze"
 	"git.ole-hartwig.eu/yasrt/cli/internal/config"
+	"git.ole-hartwig.eu/yasrt/cli/internal/forge"
 	"git.ole-hartwig.eu/yasrt/cli/internal/git"
-	"git.ole-hartwig.eu/yasrt/cli/internal/gitlab"
 	"git.ole-hartwig.eu/yasrt/cli/internal/hooks"
 	"git.ole-hartwig.eu/yasrt/cli/internal/render"
 )
@@ -88,13 +88,15 @@ type Options struct {
 	Repo   *git.Repo
 	Config *config.Config
 	Result *analyze.Result
-	Client *gitlab.Client // nil skips the GitLab steps
+	// Forge publishes the release. nil skips the publishing steps.
+	Forge forge.Client
+	// URLs builds the links in the notes; its shapes differ per platform.
+	URLs forge.URLs
 
-	Remote     string // default "origin"
-	Branch     string // branch to push the release commit to; default: current
-	Token      string // CI_JOB_TOKEN, injected into the push URL
-	ProjectURL string // used to render issue and MR links
-	GPGKeyB64  string // optional signing key
+	Remote    string // default "origin"
+	Branch    string // branch to push the release commit to; default: current
+	Token     string // CI token, injected into the push URL
+	GPGKeyB64 string // optional signing key
 
 	Now    time.Time
 	DryRun bool
@@ -125,6 +127,18 @@ func hookContext(res *analyze.Result, notes, projectURL string, dryRun bool) hoo
 		Breaking:   res.Decision.Breaking(),
 		DryRun:     dryRun,
 	}
+}
+
+// forgeKind is the platform the push credentials must suit. GitLab is the
+// fallback because that is what an unconfigured estate is.
+func (o *Options) forgeKind() forge.Kind {
+	if o.Forge != nil {
+		return o.Forge.Kind()
+	}
+	if o.URLs.Kind != "" {
+		return o.URLs.Kind
+	}
+	return forge.GitLab
 }
 
 func (o *Options) now() time.Time {
@@ -205,20 +219,20 @@ func Run(ctx context.Context, o Options) (*Report, error) {
 
 	// Step 1: notes.
 	in := render.Input{
-		Version:    res.Version,
-		Previous:   res.Previous,
-		Tag:        res.Tag,
-		Date:       o.now(),
-		Decision:   res.Decision,
-		Sections:   cfg.Changelog.Sections,
-		ProjectURL: o.ProjectURL,
+		Version:  res.Version,
+		Previous: res.Previous,
+		Tag:      res.Tag,
+		Date:     o.now(),
+		Decision: res.Decision,
+		Sections: cfg.Changelog.Sections,
+		URLs:     o.URLs,
 	}
 	notes := render.Notes(in)
 	rep.Notes = notes
 	rep.Steps = append(rep.Steps, Step{Name: "notes", Status: StepDone})
 	log.Info("release notes rendered", "version", res.Version.String(), "bytes", len(notes))
 
-	hctx := hookContext(res, notes, o.ProjectURL, o.DryRun)
+	hctx := hookContext(res, notes, o.URLs.Base, o.DryRun)
 
 	// before_tag runs while nothing has been written yet, so a hook that says
 	// no leaves the repository exactly as it found it.
@@ -259,7 +273,7 @@ func Run(ctx context.Context, o Options) (*Report, error) {
 		rep.Steps = append(rep.Steps, Step{Name: "changelog", Status: StepSkipped, Detail: "release_commit disabled"})
 	}
 
-	pushURL, err := authenticatedURL(repo, o.remote(), o.Token)
+	pushURL, err := authenticatedURL(repo, o.remote(), o.Token, o.forgeKind())
 	if err != nil {
 		return rep, err
 	}
@@ -312,15 +326,15 @@ func Run(ctx context.Context, o Options) (*Report, error) {
 	}
 
 	// Step 5: the GitLab release.
-	if cfg.GitLabReleaseEnabled() && o.Client != nil {
+	if cfg.GitLabReleaseEnabled() && o.Forge != nil {
 		url, st, detail, err := publishRelease(ctx, o, cfg, res, notes, log)
-		rep.Steps = append(rep.Steps, Step{Name: "gitlab-release", Status: st, Detail: detail})
+		rep.Steps = append(rep.Steps, Step{Name: "release", Status: st, Detail: detail})
 		if err != nil {
 			return rep, err
 		}
 		rep.ReleaseURL = url
 	} else {
-		rep.Steps = append(rep.Steps, Step{Name: "gitlab-release", Status: StepSkipped, Detail: "disabled or no API client"})
+		rep.Steps = append(rep.Steps, Step{Name: "release", Status: StepSkipped, Detail: "disabled or no forge client"})
 	}
 
 	// Step 6: follow-up triggers. Never fatal.
@@ -397,7 +411,7 @@ func commitChangelog(repo *git.Repo, cfg *config.Config, res *analyze.Result, o 
 			return StepFailed, err.Error(), sha, err
 		}
 	}
-	pushURL, err := authenticatedURL(repo, o.remote(), o.Token)
+	pushURL, err := authenticatedURL(repo, o.remote(), o.Token, o.forgeKind())
 	if err != nil {
 		return StepFailed, err.Error(), sha, err
 	}
@@ -413,64 +427,92 @@ func commitChangelog(repo *git.Repo, cfg *config.Config, res *analyze.Result, o 
 func publishRelease(ctx context.Context, o Options, cfg *config.Config, res *analyze.Result,
 	notes string, log *slog.Logger) (string, StepStatus, string, error) {
 
-	if existing, ok, err := o.Client.GetRelease(ctx, res.Tag); err != nil {
+	if existing, ok, err := o.Forge.GetRelease(ctx, res.Tag); err != nil {
 		return "", StepFailed, err.Error(), err
 	} else if ok {
-		log.Info("gitlab release already exists, skipping", "tag", res.Tag)
-		return existing.URL(), StepSkipped, "already exists", nil
+		log.Info("release already exists, skipping", "tag", res.Tag, "forge", string(o.Forge.Kind()))
+		return existing.URL, StepSkipped, "already exists", nil
 	}
 
-	rel, err := o.Client.CreateRelease(ctx, gitlab.CreateReleaseRequest{
-		TagName:     res.Tag,
-		Name:        config.Expand(cfg.GitLabRelease.Name, res.Version, res.Tag),
-		Description: notes,
-	})
+	links := make([]forge.Link, 0, len(cfg.GitLabRelease.Assets))
+	vars := config.Vars{Version: res.Version, Tag: res.Tag}
+	for _, a := range cfg.GitLabRelease.Assets {
+		links = append(links, forge.Link{
+			Name:     vars.Expand(a.Name),
+			URL:      vars.Expand(a.URL),
+			LinkType: a.LinkType,
+		})
+	}
+
+	body := notes
+	if !o.Forge.SupportsLinks() {
+		// Nowhere to attach them, so they go into the body rather than being
+		// lost. Stated in the log, not silently.
+		if md := forge.LinksAsMarkdown(links); md != "" {
+			body += md
+			log.Info("this forge has no release-link endpoint; links appended to the body",
+				"forge", string(o.Forge.Kind()), "links", len(links))
+		}
+	}
+
+	rel, err := o.Forge.CreateRelease(ctx, res.Tag, vars.Expand(cfg.GitLabRelease.Name), body)
 	if err != nil {
 		return "", StepFailed, err.Error(), err
 	}
-	log.Info("gitlab release created", "tag", res.Tag, "url", rel.URL())
+	log.Info("release published", "tag", res.Tag, "url", rel.URL, "forge", string(o.Forge.Kind()))
 
-	for _, a := range cfg.GitLabRelease.Assets {
-		l := gitlab.Link{
-			Name:     config.Expand(a.Name, res.Version, res.Tag),
-			URL:      config.Expand(a.URL, res.Version, res.Tag),
-			LinkType: a.LinkType,
-		}
-		if err := o.Client.AddReleaseLink(ctx, res.Tag, l); err != nil {
+	if o.Forge.SupportsLinks() && len(links) > 0 {
+		if err := o.Forge.AddLinks(ctx, res.Tag, links); err != nil {
 			// A missing link is not worth discarding a published release over.
-			log.Warn("release link failed", "name", l.Name, "err", err)
+			log.Warn("release links failed", "err", err)
 		}
 	}
-	return rel.URL(), StepDone, rel.URL(), nil
+	return rel.URL, StepDone, rel.URL, nil
 }
 
 func runTriggers(ctx context.Context, o Options, cfg *config.Config, res *analyze.Result,
 	log *slog.Logger) []TriggerResult {
 
+	if len(cfg.AfterRelease.Triggers) == 0 {
+		return nil
+	}
 	var out []TriggerResult
+	triggerer, canTrigger := o.Forge.(pipelineTriggerer)
 	for _, t := range cfg.AfterRelease.Triggers {
 		r := TriggerResult{Project: t.Project, Ref: t.Ref}
-		if o.Client == nil {
-			r.Error = "no API client"
-			out = append(out, r)
-			continue
-		}
-		vars := make(map[string]string, len(t.Variables)+2)
-		for k, v := range t.Variables {
-			vars[k] = expandEnv(config.Expand(v, res.Version, res.Tag))
-		}
-		p, err := o.Client.TriggerPipeline(ctx, t.Project, t.Ref, vars)
-		if err != nil {
-			// Non-fatal by design: the release is already published.
-			r.Error = err.Error()
-			log.Warn("follow-up trigger failed", "project", t.Project, "err", err)
-		} else {
-			r.Pipeline = p.WebURL
-			log.Info("follow-up pipeline triggered", "project", t.Project, "pipeline", p.WebURL)
+		switch {
+		case o.Forge == nil:
+			r.Error = "no forge client"
+		case !canTrigger:
+			// Only GitLab has the endpoint yasrt posts to. Dispatching a
+			// workflow elsewhere is a different call with different
+			// permissions, and guessing at it would be worse than saying so.
+			r.Error = fmt.Sprintf("%s has no pipeline-trigger endpoint", o.Forge.Kind())
+			log.Warn("follow-up trigger not delivered", "forge", string(o.Forge.Kind()), "project", t.Project)
+		default:
+			vars := make(map[string]string, len(t.Variables))
+			for k, v := range t.Variables {
+				vars[k] = expandEnv(config.Vars{Version: res.Version, Tag: res.Tag}.Expand(v))
+			}
+			url, err := triggerer.TriggerPipeline(ctx, t.Project, t.Ref, vars)
+			if err != nil {
+				// Non-fatal by design: the release is already published.
+				r.Error = err.Error()
+				log.Warn("follow-up trigger failed", "project", t.Project, "err", err)
+			} else {
+				r.Pipeline = url
+				log.Info("follow-up pipeline triggered", "project", t.Project, "pipeline", url)
+			}
 		}
 		out = append(out, r)
 	}
 	return out
+}
+
+// pipelineTriggerer is implemented only where the platform has an endpoint for
+// starting a pipeline in another project.
+type pipelineTriggerer interface {
+	TriggerPipeline(ctx context.Context, project, ref string, vars map[string]string) (string, error)
 }
 
 // expandEnv resolves ${CI_PROJECT_PATH} style references in trigger variables.
@@ -516,7 +558,7 @@ func firstNonEmpty(vals ...string) string {
 
 // authenticatedURL returns a push URL carrying the job token. The token is
 // registered as a secret first, so it cannot appear in an error message.
-func authenticatedURL(repo *git.Repo, remote, token string) (string, error) {
+func authenticatedURL(repo *git.Repo, remote, token string, kind forge.Kind) (string, error) {
 	raw, err := repo.RemoteURL(remote)
 	if err != nil {
 		return "", err
@@ -528,7 +570,7 @@ func authenticatedURL(repo *git.Repo, remote, token string) (string, error) {
 	if i := strings.IndexByte(rest, '@'); i >= 0 {
 		rest = rest[i+1:] // replace any credentials already present
 	}
-	url := "https://gitlab-ci-token:" + token + "@" + rest
+	url := "https://" + forge.PushCredentials(kind, token) + "@" + rest
 	repo.AddSecret(url)
 	return url, nil
 }

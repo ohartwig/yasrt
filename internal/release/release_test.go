@@ -23,8 +23,8 @@ import (
 
 	"git.ole-hartwig.eu/yasrt/cli/internal/analyze"
 	"git.ole-hartwig.eu/yasrt/cli/internal/config"
+	"git.ole-hartwig.eu/yasrt/cli/internal/forge"
 	"git.ole-hartwig.eu/yasrt/cli/internal/git"
-	"git.ole-hartwig.eu/yasrt/cli/internal/gitlab"
 	"git.ole-hartwig.eu/yasrt/cli/internal/release"
 	"git.ole-hartwig.eu/yasrt/cli/internal/testrepo"
 )
@@ -83,9 +83,19 @@ func newFakeGitLab(t *testing.T) *fakeGitLab {
 	return f
 }
 
-func (f *fakeGitLab) client() *gitlab.Client {
-	c := gitlab.New(f.srv.URL+"/api/v4", "42", "job-token")
-	c.Backoff = time.Millisecond
+func (f *fakeGitLab) client() forge.Client { return forgeClient(nil, f.srv.URL+"/api/v4") }
+
+// forgeClient builds a GitLab client against a test server.
+func forgeClient(t *testing.T, apiURL string) forge.Client {
+	c, _, err := forge.New(forge.Environment{
+		Kind: forge.GitLab, APIURL: apiURL, Repo: "42", Token: "job-token",
+	}, "")
+	if err != nil {
+		if t != nil {
+			t.Fatal(err)
+		}
+		panic(err)
+	}
 	return c
 }
 
@@ -127,8 +137,9 @@ func setup(t *testing.T, cfgSrc string) *scenario {
 
 func (s *scenario) opts() release.Options {
 	return release.Options{
-		Repo: s.repo, Config: s.cfg, Result: s.res, Client: s.gl.client(),
-		Remote: "origin", Branch: "main", ProjectURL: "https://git/x",
+		Repo: s.repo, Config: s.cfg, Result: s.res, Forge: s.gl.client(),
+		URLs:   forge.URLs{Kind: forge.GitLab, Base: "https://git/x"},
+		Remote: "origin", Branch: "main",
 		Now: fixedNow, Log: discard,
 	}
 }
@@ -177,7 +188,7 @@ func TestFullRelease(t *testing.T) {
 	if rep.ReleaseURL == "" {
 		t.Error("report should carry the release URL")
 	}
-	for _, step := range []string{"notes", "changelog", "tag", "release-commit", "gitlab-release"} {
+	for _, step := range []string{"notes", "changelog", "tag", "release-commit", "release"} {
 		if got := stepStatus(rep, step); got != release.StepDone {
 			t.Errorf("step %s = %q, want done", step, got)
 		}
@@ -277,8 +288,8 @@ func TestRerunIsIdempotent(t *testing.T) {
 	if s.gl.creates.Load() != 1 {
 		t.Errorf("the release must not be created twice: %d", s.gl.creates.Load())
 	}
-	if got := stepStatus(second, "gitlab-release"); got != release.StepSkipped {
-		t.Errorf("second gitlab-release = %q, want skipped", got)
+	if got := stepStatus(second, "release"); got != release.StepSkipped {
+		t.Errorf("second release step = %q, want skipped", got)
 	}
 	if got := stepStatus(second, "changelog"); got != release.StepSkipped {
 		t.Errorf("second changelog = %q, want skipped", got)
@@ -358,9 +369,7 @@ after_release:
 	}))
 	t.Cleanup(srv.Close)
 	o := s.opts()
-	c := gitlab.New(srv.URL+"/api/v4", "42", "job-token")
-	c.Backoff = time.Millisecond
-	o.Client = c
+	o.Forge = forgeClient(t, srv.URL+"/api/v4")
 
 	rep, err := release.Run(context.Background(), o)
 	if err != nil {
@@ -452,7 +461,7 @@ func TestReleaseNotesReachGitLab(t *testing.T) {
 
 	s := setup(t, "product: image\n")
 	o := s.opts()
-	o.Client = gitlab.New(srv.URL+"/api/v4", "42", "job-token")
+	o.Forge = forgeClient(t, srv.URL+"/api/v4")
 	run(t, o)
 
 	desc, _ := body["description"].(string)

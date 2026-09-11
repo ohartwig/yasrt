@@ -16,6 +16,15 @@ ARG GIT_APK_VERSION="2.51.0-r0"
 
 USER root
 
+# Address selection before the first apk call (estate rule K38). The build
+# fleet has no public IPv4; without this, apk tries the A records first, waits
+# out a sixty-second timeout per step and only then falls back. The build stays
+# green and merely takes twenty minutes longer, which is how it went unnoticed
+# in ten images for eleven weeks. Copied verbatim from devops/images/wolfi-base;
+# note that a heredoc here is parsed as a LABEL instruction by some tooling, so
+# printf it is.
+RUN printf 'label     ::1/128       0\nlabel     ::/0          1\nlabel     ::ffff:0:0/96 4\nprecedence ::1/128       50\nprecedence ::/0          40\nprecedence ::ffff:0:0/96 10\n' > /etc/gai.conf
+
 # One layer: the packages, the trust store, and the smoke test that proves the
 # tools are actually there. The estate has shipped silently broken images
 # before; checking costs nothing here and catches it at build time.

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.0] - 2026-09-11
+
+### :sparkles: Features
+
+- match semantic-release's output, not my reading of it (34341d6)
+
 ## [1.2.1] - 2026-09-11
 
 ### :bug: Fixes

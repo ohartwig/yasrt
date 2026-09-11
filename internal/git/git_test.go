@@ -290,6 +290,24 @@ func TestMaskURLCredentials(t *testing.T) {
 	}
 }
 
+// The masker used to return after the first match, so a second credentialed
+// URL in the same line survived. golangci-lint's SA4004 found it.
+func TestMaskURLCredentialsMasksEveryOccurrence(t *testing.T) {
+	in := "fatal: https://a:secret1@host/x.git failed, retrying https://b:secret2@host/y.git"
+	got := git.MaskURLCredentials(in)
+	for _, leaked := range []string{"secret1", "secret2"} {
+		if strings.Contains(got, leaked) {
+			t.Errorf("%s survived masking: %q", leaked, got)
+		}
+	}
+	if strings.Count(got, "***") != 2 {
+		t.Errorf("expected two masked credentials, got %q", got)
+	}
+	if !strings.Contains(got, "host/x.git") || !strings.Contains(got, "host/y.git") {
+		t.Errorf("the rest of the message must survive: %q", got)
+	}
+}
+
 func TestMaskRegisteredSecretInErrors(t *testing.T) {
 	tr := testrepo.New(t)
 	tr.CommitFile("a.txt", "1", "feat: first")

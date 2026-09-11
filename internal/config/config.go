@@ -224,7 +224,7 @@ func Load(path string) (*Config, error) {
 		}
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return parse(f, path)
 }
 

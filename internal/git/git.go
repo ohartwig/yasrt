@@ -73,22 +73,29 @@ func (r *Repo) Mask(s string) string {
 
 // MaskURLCredentials rewrites https://user:secret@host as https://***@host.
 func MaskURLCredentials(s string) string {
+	var b strings.Builder
+	rest := s
 	for {
-		i := strings.Index(s, "://")
+		i := strings.Index(rest, "://")
 		if i < 0 {
-			return s
+			b.WriteString(rest)
+			return b.String()
 		}
-		rest := s[i+3:]
+		b.WriteString(rest[:i+3])
+		rest = rest[i+3:]
+
 		at := strings.IndexByte(rest, '@')
 		if at < 0 {
-			return s
+			b.WriteString(rest)
+			return b.String()
 		}
-		// Only treat it as credentials when nothing space-like intervenes.
-		cred := rest[:at]
-		if strings.ContainsAny(cred, " \t\n/") {
-			return s
+		// Only credentials when nothing space-like intervenes; otherwise this
+		// is an ordinary URL followed by prose that happens to contain an @.
+		if strings.ContainsAny(rest[:at], " \t\n/") {
+			continue
 		}
-		return s[:i+3] + "***" + rest[at:]
+		b.WriteString("***")
+		rest = rest[at:]
 	}
 }
 

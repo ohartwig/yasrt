@@ -159,7 +159,7 @@ func runOne(ctx context.Context, dir string, event Event, h Hook, payload []byte
 	if err != nil {
 		res.Error = err.Error()
 		res.Fatal = true
-		return res, fmt.Errorf("%w: %v", ErrHookFailed, err)
+		return res, fmt.Errorf("%w: %w", ErrHookFailed, err)
 	}
 
 	runCtx, cancel := context.WithTimeout(ctx, timeout)

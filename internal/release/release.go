@@ -403,7 +403,7 @@ func commitChangelog(repo *git.Repo, cfg *config.Config, res *analyze.Result, o 
 }
 
 func publishRelease(ctx context.Context, o Options, cfg *config.Config, res *analyze.Result,
-	notes string, log *slog.Logger) (url string, st StepStatus, detail string, err error) {
+	notes string, log *slog.Logger) (string, StepStatus, string, error) {
 
 	if existing, ok, err := o.Client.GetRelease(ctx, res.Tag); err != nil {
 		return "", StepFailed, err.Error(), err
@@ -558,7 +558,7 @@ func setupSigning(repo *git.Repo, cfg *config.Config, keyB64 string, log *slog.L
 	keyID, err := importGPGKey(keyB64)
 	if err != nil {
 		if cfg.ReleaseCommit.Sign == config.SignRequired {
-			return false, fmt.Errorf("%w: %v", ErrSigningRequired, err)
+			return false, fmt.Errorf("%w: %w", ErrSigningRequired, err)
 		}
 		log.Warn("signing key unusable, continuing unsigned", "err", err)
 		return unsigned()

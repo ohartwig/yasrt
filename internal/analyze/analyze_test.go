@@ -496,3 +496,100 @@ func TestPrereleases(t *testing.T) {
 		}
 	})
 }
+
+// Maintenance branches (semantic-release's 1.x / 1.2.x). The defining property
+// is not that the branch is old but that a release cannot leave its range: a
+// breaking change on 1.x ships as 1.y.0, never as 2.0.0.
+func TestMaintenanceBranches(t *testing.T) {
+	cfgSrc := "product: image\nversioning:\n  maintenance: [\"1.x\", \"1.2.x\"]\n"
+
+	// A repository that has moved on to 2.x, with a 1.x line still alive.
+	newRepo := func(t *testing.T) *testrepo.Repo {
+		tr := testrepo.New(t)
+		tr.CommitFile("src/main.go", "1", "feat: first")
+		tr.Tag("1.2.3")
+		tr.CommitFile("src/b.go", "2", "feat!: the next major")
+		tr.Tag("2.0.0")
+		return tr
+	}
+
+	t.Run("a fix on 1.x builds on the 1.x line, not on 2.0.0", func(t *testing.T) {
+		tr := newRepo(t)
+		tr.Git("checkout", "-q", "-b", "1.x", "1.2.3")
+		tr.CommitFile("src/fix.go", "f", "fix: backported")
+
+		res := run(t, tr, cfg(t, cfgSrc), analyze.Options{Branch: "1.x"})
+		if res.Version.String() != "1.2.4" {
+			t.Errorf("version = %s, want 1.2.4", res.Version)
+		}
+		if res.Previous != "1.2.3" {
+			t.Errorf("previous = %q — 2.0.0 is history here, not a baseline", res.Previous)
+		}
+		if res.Maintenance != "1.x" {
+			t.Errorf("maintenance = %q", res.Maintenance)
+		}
+	})
+
+	t.Run("a feature on 1.x raises the minor", func(t *testing.T) {
+		tr := newRepo(t)
+		tr.Git("checkout", "-q", "-b", "1.x", "1.2.3")
+		tr.CommitFile("src/f.go", "f", "feat: backported feature")
+
+		res := run(t, tr, cfg(t, cfgSrc), analyze.Options{Branch: "1.x"})
+		if res.Version.String() != "1.3.0" {
+			t.Errorf("version = %s, want 1.3.0", res.Version)
+		}
+	})
+
+	// The defining case.
+	t.Run("a breaking change on 1.x cannot leave the range", func(t *testing.T) {
+		tr := newRepo(t)
+		tr.Git("checkout", "-q", "-b", "1.x", "1.2.3")
+		tr.CommitFile("src/b.go", "b", "feat!: breaking, but on a maintenance branch")
+
+		res := run(t, tr, cfg(t, cfgSrc), analyze.Options{Branch: "1.x"})
+		if res.Version.String() != "1.3.0" {
+			t.Errorf("version = %s, want 1.3.0 — a maintenance branch may not reach 2.0.0", res.Version)
+		}
+	})
+
+	t.Run("1.2.x is pinned to its minor", func(t *testing.T) {
+		tr := newRepo(t)
+		tr.Git("checkout", "-q", "-b", "1.2.x", "1.2.3")
+		tr.CommitFile("src/f.go", "f", "feat: would normally raise the minor")
+
+		res := run(t, tr, cfg(t, cfgSrc), analyze.Options{Branch: "1.2.x"})
+		if res.Version.String() != "1.2.4" {
+			t.Errorf("version = %s, want 1.2.4 — 1.2.x may not reach 1.3.0", res.Version)
+		}
+	})
+
+	t.Run("the default branch is unaffected", func(t *testing.T) {
+		tr := newRepo(t)
+		tr.CommitFile("src/c.go", "c", "feat: on main")
+
+		res := run(t, tr, cfg(t, cfgSrc), analyze.Options{Branch: "main"})
+		if res.Maintenance != "" {
+			t.Errorf("maintenance = %q on main", res.Maintenance)
+		}
+		if res.Version.String() != "2.1.0" {
+			t.Errorf("version = %s — main still builds on 2.0.0", res.Version)
+		}
+	})
+
+	t.Run("an unconfigured branch named like a range is not one", func(t *testing.T) {
+		tr := newRepo(t)
+		tr.Git("checkout", "-q", "-b", "3.x", "1.2.3")
+		tr.CommitFile("src/f.go", "f", "feat!: breaking")
+
+		// 3.x is not listed in versioning.maintenance, so it is an ordinary
+		// branch: nothing is capped and nothing is restricted.
+		res := run(t, tr, cfg(t, cfgSrc), analyze.Options{Branch: "3.x"})
+		if res.Maintenance != "" {
+			t.Errorf("maintenance = %q", res.Maintenance)
+		}
+		if res.Version.String() != "2.0.0" {
+			t.Errorf("version = %s", res.Version)
+		}
+	})
+}

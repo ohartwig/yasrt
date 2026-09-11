@@ -15,6 +15,7 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -105,6 +106,75 @@ type Versioning struct {
 	// prerelease on main and cuts stable from `release`, moselwal-packages
 	// does the opposite.
 	Prereleases map[string]string `yaml:"prereleases"`
+	// Maintenance lists branches that release inside a fixed version range,
+	// written the way semantic-release writes them: "1.x" keeps a release
+	// inside major 1, "1.2.x" inside minor 1.2. A breaking change on such a
+	// branch cannot leave the range — that is what makes it a maintenance
+	// branch rather than just an old one.
+	Maintenance []string `yaml:"maintenance"`
+}
+
+// maintenanceRE matches the conventional shapes: 1.x and 1.2.x.
+var maintenanceRE = regexp.MustCompile(`^(\d+)\.(?:(\d+)\.)?x$`)
+
+// Range is the version window a maintenance branch may release within.
+type Range struct {
+	Major uint64
+	Minor uint64
+	// HasMinor distinguishes 1.2.x, which is pinned to a minor, from 1.x,
+	// which may still raise it.
+	HasMinor bool
+}
+
+// Contains reports whether a version falls inside the range.
+func (r Range) Contains(v semver.Version) bool {
+	if v.Major != r.Major {
+		return false
+	}
+	return !r.HasMinor || v.Minor == r.Minor
+}
+
+// Cap lowers a bump that would leave the range: on 1.x a major becomes a
+// minor, on 1.2.x anything above a patch becomes a patch.
+func (r Range) Cap(b semver.Bump) semver.Bump {
+	if r.HasMinor {
+		if b > semver.Patch {
+			return semver.Patch
+		}
+		return b
+	}
+	if b > semver.Minor {
+		return semver.Minor
+	}
+	return b
+}
+
+func (r Range) String() string {
+	if r.HasMinor {
+		return fmt.Sprintf("%d.%d.x", r.Major, r.Minor)
+	}
+	return fmt.Sprintf("%d.x", r.Major)
+}
+
+// MaintenanceFor reports the range a branch releases within, if it is one.
+func (c *Config) MaintenanceFor(branch string) (Range, bool) {
+	for _, b := range c.Versioning.Maintenance {
+		if b != branch {
+			continue
+		}
+		m := maintenanceRE.FindStringSubmatch(branch)
+		if m == nil {
+			return Range{}, false
+		}
+		var r Range
+		r.Major, _ = strconv.ParseUint(m[1], 10, 64)
+		if m[2] != "" {
+			r.Minor, _ = strconv.ParseUint(m[2], 10, 64)
+			r.HasMinor = true
+		}
+		return r, true
+	}
+	return Range{}, false
 }
 
 // PrereleaseFor returns the identifier a branch releases under, and whether the
@@ -382,6 +452,12 @@ func (c *Config) validate() error {
 	case SignAuto, SignRequired, SignOff:
 	default:
 		errs = append(errs, fmt.Errorf("release_commit.sign: %q is not auto, required or off", c.ReleaseCommit.Sign))
+	}
+	for _, b := range c.Versioning.Maintenance {
+		if !maintenanceRE.MatchString(b) {
+			errs = append(errs, fmt.Errorf(
+				"versioning.maintenance: %q is not a range like 1.x or 1.2.x", b))
+		}
 	}
 	for branch, id := range c.Versioning.Prereleases {
 		if branch == "" {

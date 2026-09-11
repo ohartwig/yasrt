@@ -23,9 +23,21 @@ GitLab CI/CD component. It
 ## 2. Non-goals
 
 - Monorepos with several independently versioned packages.
-- Maintenance branch models (`1.x`, `2.x`). Prereleases **are** supported as of v0.3 — see
-  §5.3 — because `-rc.N` is live in `gsb11/extensions/*` and `moselwal-packages/*` and those
-  repositories could not otherwise migrate.
+Prereleases (§5.3) and maintenance branches (§5.5) **are** supported. What
+remains out of scope, and why:
+
+- **Monorepos with independently versioned packages.** No repository in this
+  estate does this: `development/moselwal/dev` carries nested configurations but
+  releases as one version series. Building it would change the core model from
+  one version per repository to N, for no current consumer.
+- **Forges other than GitLab.** Nine repositories mirror to GitHub or notify
+  Packagist, but every release is cut on GitLab; GitHub is a mirror target, not
+  a release target.
+- **Publishing to registries.** Four components already do this
+  (`composer-package-gitlab-release`, `typo3-extension-release`,
+  `packagist-submit`, `cleanup-release-tags`), and an `after_release` hook
+  covers anything they do not. Duplicating working infrastructure inside the
+  release tool would give two places to be wrong.
 - Plugin system **as a package chain**. semantic-release's plugins are npm
   packages resolved at run time, which is what produces the 384–516 unpinned
   transitive dependencies and the ~21 s `npm install` this tool exists to
@@ -202,6 +214,27 @@ are a plain file written by the component the repository already includes and
 pins. No registry, no network, no resolution step. This matters because the
 estate keeps release configuration central on purpose — 90 repositories carry
 none of their own, and the shared template says so in as many words.
+
+### 5.5 Maintenance branches
+
+```yaml
+versioning:
+  maintenance: ["1.x", "1.2.x"]
+```
+
+A branch listed here releases inside its own line of versions. Two things follow,
+and the second is what makes it a maintenance branch rather than merely an old
+one:
+
+- **The baseline is restricted to the range.** A `2.0.0` tag reachable from
+  `1.x` is history, not a predecessor, so a fix on `1.x` after `1.2.3` becomes
+  `1.2.4` and not `2.0.1`.
+- **A bump that would leave the range is lowered, not refused.** A breaking
+  change on `1.x` ships as `1.3.0`; on `1.2.x` a feature ships as `1.2.4`. The
+  fix still ships — it simply cannot take the branch out of its line.
+
+Only branches listed here are treated this way. A branch merely *named* `3.x` is
+an ordinary branch.
 
 ### 5.3 Prereleases
 

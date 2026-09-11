@@ -51,6 +51,14 @@
             "type": "string",
             "pattern": "^[0-9A-Za-z-]+$"
           }
+        },
+        "maintenance": {
+          "type": "array",
+          "description": "Branches that release inside a fixed version range, written as semantic-release writes them: 1.x keeps a release inside major 1, 1.2.x inside minor 1.2. A bump that would leave the range is lowered rather than refused.",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.([0-9]+\\.)?x$"
+          }
         }
       }
     },

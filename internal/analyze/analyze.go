@@ -79,6 +79,9 @@ type Result struct {
 	// release. Branch is the branch it was decided for.
 	Prerelease string
 	Branch     string
+	// Maintenance is the range this branch releases within, empty when it is
+	// not a maintenance branch.
+	Maintenance string
 
 	Decision rules.Decision
 	Delivery deliver.Result
@@ -148,6 +151,14 @@ func Run(repo *git.Repo, cfg *config.Config, opts Options, log *slog.Logger) (*R
 	if isPrerelease {
 		res.Prerelease = preID
 	}
+	maintRange, isMaintenance := cfg.MaintenanceFor(res.Branch)
+	if isMaintenance {
+		res.Maintenance = maintRange.String()
+		// A maintenance branch releases inside its own line of versions, so
+		// anything outside it is not a predecessor — a 2.0.0 tag reachable
+		// from 1.x is history, not a baseline.
+		base = base.restrictTo(maintRange)
+	}
 
 	// The notes and the changed paths are measured from the last release of any
 	// kind; the version core is computed from the last stable one. On a stable
@@ -172,6 +183,18 @@ func Run(repo *git.Repo, cfg *config.Config, opts Options, log *slog.Logger) (*R
 
 	res.Bump = res.Decision.Bump
 	res.Reason = res.Decision.Reason
+
+	// A breaking change cannot leave the range: that is what makes this a
+	// maintenance branch rather than merely an old one. The bump is lowered
+	// rather than refused, so the fix still ships.
+	if isMaintenance {
+		capped := maintRange.Cap(res.Bump)
+		if capped != res.Bump {
+			log.Info("bump capped by the maintenance range",
+				"range", maintRange.String(), "from", res.Bump.String(), "to", capped.String())
+			res.Bump = capped
+		}
+	}
 
 	// A prerelease accumulates everything since the last stable release, so the
 	// core version follows from that wider range even though the notes do not.
@@ -280,6 +303,38 @@ type baseline struct {
 	Prereleases []semver.Version
 
 	Warnings []string
+}
+
+// restrictTo drops everything outside a maintenance range, so that the branch
+// is compared against its own line of versions rather than against whatever
+// happens to be newest in the repository.
+func (b baseline) restrictTo(r config.Range) baseline {
+	out := baseline{Warnings: b.Warnings}
+	keep := func(tag string, v semver.Version, stable bool) {
+		if !r.Contains(v) {
+			return
+		}
+		if !out.HasAny || out.Any.Less(v) {
+			out.AnyTag, out.Any, out.HasAny = tag, v, true
+		}
+		if stable {
+			if !out.HasStable || out.Stable.Less(v) {
+				out.StableTag, out.Stable, out.HasStable = tag, v, true
+			}
+		}
+	}
+	if b.HasStable {
+		keep(b.StableTag, b.Stable, true)
+	}
+	if b.HasAny {
+		keep(b.AnyTag, b.Any, b.Any.Pre == "")
+	}
+	for _, v := range b.Prereleases {
+		if r.Contains(v) {
+			out.Prereleases = append(out.Prereleases, v)
+		}
+	}
+	return out
 }
 
 // findBaseline collects the tags in tag_format that are reachable from ref.

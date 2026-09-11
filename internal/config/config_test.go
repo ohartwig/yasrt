@@ -46,7 +46,9 @@ func TestMinimalConfigGetsDefaults(t *testing.T) {
 	if c.ReleaseCommit.Sign != SignAuto {
 		t.Errorf("sign = %q", c.ReleaseCommit.Sign)
 	}
-	if c.ReleaseCommit.Message != "chore(release): ${version}" {
+	// Subject, blank line, notes — the shape the npm preset produces, so a
+	// migrated repository's history keeps the same form.
+	if c.ReleaseCommit.Message != "chore(release): ${version}\n\n${notes}" {
 		t.Errorf("message = %q", c.ReleaseCommit.Message)
 	}
 	if len(c.Rules) != len(DefaultRules()) {

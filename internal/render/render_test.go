@@ -50,6 +50,7 @@ func input(commits ...conventional.Commit) render.Input {
 	return render.Input{
 		Version:    semver.Version{Major: 3, Minor: 4, Patch: 0},
 		Previous:   "3.3.2",
+		Tag:        "3.4.0",
 		Date:       time.Date(2026, 9, 11, 0, 0, 0, 0, time.UTC),
 		Decision:   rules.Decision{Counted: commits},
 		Sections:   config.DefaultSections(),
@@ -119,7 +120,7 @@ func TestNotesProseNumbersAreNotReferences(t *testing.T) {
 
 func TestNotesEntryWithoutScope(t *testing.T) {
 	out := render.Notes(input(commit("aaa1111", "feat: no scope here")))
-	if !strings.Contains(out, "- no scope here (aaa1111)") {
+	if !strings.Contains(out, "* no scope here (") {
 		t.Errorf("got:\n%s", out)
 	}
 }
@@ -137,7 +138,7 @@ func TestChangelogCreatedWhenMissing(t *testing.T) {
 }
 
 func TestChangelogPrependsUnderTitle(t *testing.T) {
-	existing := "# Changelog\n\nAll notable changes.\n\n## [3.3.2] - 2026-08-01\n\n### :bug: Fixes\n\n- old fix (999zzzz)\n"
+	existing := "# Changelog\n\nAll notable changes.\n\n## [3.3.2] (2026-08-01)\n\n### :bug: Fixes\n\n* old fix (999zzzz)\n"
 	in := input(commit("aaa1111", "feat: something new"))
 	got := render.PrependChangelog(existing, in, render.Notes(in))
 	if !strings.HasPrefix(got, "# Changelog\n") {
@@ -150,7 +151,7 @@ func TestChangelogPrependsUnderTitle(t *testing.T) {
 }
 
 func TestChangelogWithoutTitle(t *testing.T) {
-	existing := "## [3.3.2] - 2026-08-01\n\n- old thing\n"
+	existing := "## [3.3.2] (2026-08-01)\n\n* old thing\n"
 	in := input(commit("aaa1111", "fix: newer thing"))
 	got := render.PrependChangelog(existing, in, render.Notes(in))
 	if !strings.HasPrefix(got, "## [3.4.0]") {
@@ -161,7 +162,7 @@ func TestChangelogWithoutTitle(t *testing.T) {
 func TestChangelogHeading(t *testing.T) {
 	got := render.ChangelogHeading(semver.Version{Major: 1, Minor: 2, Patch: 3},
 		time.Date(2026, 9, 11, 13, 30, 0, 0, time.UTC))
-	if got != "## [1.2.3] - 2026-09-11" {
+	if got != "## [1.2.3] (2026-09-11)" {
 		t.Errorf("got %q", got)
 	}
 }

@@ -14,7 +14,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+
+	"github.com/bmatcuk/doublestar/v4"
 )
 
 // Field and record separators for log parsing. Both are control characters that
@@ -315,7 +318,15 @@ func (r *Repo) Config(key, value string) error {
 func (r *Repo) Add(paths ...string) error {
 	var present []string
 	for _, p := range paths {
-		if _, err := os.Stat(r.dir + "/" + p); err == nil {
+		// Globs, because the plugin this replaces accepts them and a
+		// repository listing docs/*.md would otherwise stage nothing and
+		// commit nothing, silently.
+		matches, err := doublestar.Glob(os.DirFS(r.dir), p)
+		if err == nil && len(matches) > 0 {
+			present = append(present, matches...)
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(r.dir, p)); err == nil {
 			present = append(present, p)
 		}
 	}

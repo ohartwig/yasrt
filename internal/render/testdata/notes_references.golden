@@ -1,7 +1,7 @@
 ### :sparkles: Features
 
-- something (bbb2222) ([#7](https://git.ole-hartwig.eu/yasrt/cli/-/issues/7), [#8](https://git.ole-hartwig.eu/yasrt/cli/-/issues/8))
+* something ([bbb2222](https://git.ole-hartwig.eu/yasrt/cli/commit/bbb22220000000000000000000000000000000)) ([#7](https://git.ole-hartwig.eu/yasrt/cli/issues/7), [#8](https://git.ole-hartwig.eu/yasrt/cli/issues/8))
 
 ### :bug: Fixes
 
-- correct the guard (aaa1111) ([#42](https://git.ole-hartwig.eu/yasrt/cli/-/issues/42), [!17](https://git.ole-hartwig.eu/yasrt/cli/-/merge_requests/17))
+* correct the guard ([aaa1111](https://git.ole-hartwig.eu/yasrt/cli/commit/aaa11110000000000000000000000000000000)) ([#42](https://git.ole-hartwig.eu/yasrt/cli/issues/42), [!17](https://git.ole-hartwig.eu/yasrt/cli/merge_requests/17))

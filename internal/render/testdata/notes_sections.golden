@@ -1,16 +1,16 @@
 ### :sparkles: Features
 
-- config: derive tag format from product (bbb2222)
-- add the check subcommand (eee5555)
+* **config:** derive tag format from product ([bbb2222](https://git.ole-hartwig.eu/yasrt/cli/commit/bbb22220000000000000000000000000000000))
+* add the check subcommand ([eee5555](https://git.ole-hartwig.eu/yasrt/cli/commit/eee55550000000000000000000000000000000))
 
 ### :bug: Fixes
 
-- parser: keep multi-line bodies (ccc3333)
+* **parser:** keep multi-line bodies ([ccc3333](https://git.ole-hartwig.eu/yasrt/cli/commit/ccc33330000000000000000000000000000000))
 
 ### :memo: Documentation
 
-- explain the loop guards (ddd4444)
+* explain the loop guards ([ddd4444](https://git.ole-hartwig.eu/yasrt/cli/commit/ddd44440000000000000000000000000000000))
 
 ### :wrench: Chores
 
-- tidy up (aaa1111)
+* tidy up ([aaa1111](https://git.ole-hartwig.eu/yasrt/cli/commit/aaa11110000000000000000000000000000000))

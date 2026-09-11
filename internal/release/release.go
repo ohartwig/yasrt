@@ -207,6 +207,7 @@ func Run(ctx context.Context, o Options) (*Report, error) {
 	in := render.Input{
 		Version:    res.Version,
 		Previous:   res.Previous,
+		Tag:        res.Tag,
 		Date:       o.now(),
 		Decision:   res.Decision,
 		Sections:   cfg.Changelog.Sections,
@@ -300,7 +301,7 @@ func Run(ctx context.Context, o Options) (*Report, error) {
 
 	// Step 4: the release commit, after the tag on purpose.
 	if cfg.ReleaseCommitEnabled() {
-		st, detail, sha, err := commitChangelog(repo, cfg, res, o, sign, changelogStaged, log)
+		st, detail, sha, err := commitChangelog(repo, cfg, res, o, sign, changelogStaged, notes, log)
 		rep.Steps = append(rep.Steps, Step{Name: "release-commit", Status: st, Detail: detail})
 		if err != nil {
 			return rep, err
@@ -366,7 +367,7 @@ func writeChangelog(dir, file string, in render.Input, notes string) (bool, erro
 }
 
 func commitChangelog(repo *git.Repo, cfg *config.Config, res *analyze.Result, o Options,
-	sign, changed bool, log *slog.Logger) (StepStatus, string, string, error) {
+	sign, changed bool, notes string, log *slog.Logger) (StepStatus, string, string, error) {
 
 	if err := repo.Add(cfg.ReleaseCommit.Assets...); err != nil {
 		return StepFailed, err.Error(), "", err
@@ -380,7 +381,7 @@ func commitChangelog(repo *git.Repo, cfg *config.Config, res *analyze.Result, o 
 		return StepSkipped, "no changes to commit", "", nil
 	}
 
-	msg := config.Expand(cfg.ReleaseCommit.Message, res.Version, res.Tag)
+	msg := config.Vars{Version: res.Version, Tag: res.Tag, Notes: notes}.Expand(cfg.ReleaseCommit.Message)
 	if err := repo.Commit(msg, cfg.ReleaseCommit.Author, sign); err != nil {
 		return StepFailed, err.Error(), "", err
 	}
@@ -405,7 +406,8 @@ func commitChangelog(repo *git.Repo, cfg *config.Config, res *analyze.Result, o 
 		return StepFailed, masked, sha, fmt.Errorf("pushing the release commit failed: %s", masked)
 	}
 	log.Info("release commit pushed", "sha", short(sha), "branch", branch, "signed", sign)
-	return StepDone, msg, sha, nil
+	subject, _, _ := strings.Cut(msg, "\n")
+	return StepDone, subject, sha, nil
 }
 
 func publishRelease(ctx context.Context, o Options, cfg *config.Config, res *analyze.Result,

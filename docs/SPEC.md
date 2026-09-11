@@ -324,8 +324,26 @@ For `no-bump` / `not-deliverable`, `RELEASE_VERSION`/`RELEASE_TAG` are empty.
 
 **Flow, in this order:**
 
-1. **Release notes** (F4) rendered from the analysed commits. Sections only if non-empty. Entry: `- <scope>: <description> (<short sha>)`. Breaking changes as a dedicated `:boom: BREAKING CHANGES` block before all sections. MR/issue references from footers as links.
-2. **CHANGELOG** (F5): prepend block `## [${version}] - YYYY-MM-DD` with the notes; create the file if missing.
+1. **Release notes** (F4) rendered from the analysed commits, in the shape
+   `conventional-changelog` produces — because that is what every `CHANGELOG.md`
+   in this estate already contains, and a migrated repository would otherwise
+   change format halfway down the file:
+
+   ```text
+   ## [1.1.1](<project>/compare/1.1.0...1.1.1) (2026-08-24)
+
+   ### :bug: Fixes
+
+   * **scope:** description ([abc1234](<project>/commit/<sha>)) ([#7](<project>/issues/7))
+   ```
+
+   Sections only if non-empty. Breaking changes as a dedicated
+   `:boom: BREAKING CHANGES` block before all sections. Links omit the `/-/`
+   infix, matching the existing files; GitLab serves both forms.
+2. **CHANGELOG** (F5): prepend the block above; create the file if missing,
+   with no document title — the estate's changelogs start at the first release
+   heading, and adding one would put a line above every file's history at the
+   moment it migrates.
 3. **Tag** (F7, part 1): annotated tag on `RELEASE_COMMIT` (not on the release commit — provenance: the tag points at what was built). Push with job token.
 4. **Release commit** (F6): commit `CHANGELOG.md`, message from `release_commit.message`; signature per `sign`. Push to the default branch with job token. **After** the tag, so a failure here leaves a complete release behind, not a half one.
 5. **GitLab release** (F7, part 2): `POST /projects/:id/releases` with `JOB-TOKEN`, `tag_name`, `description` = notes, optional `assets.links`.

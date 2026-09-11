@@ -2,14 +2,14 @@
 
 All notable changes.
 
-## [3.4.0] - 2026-09-11
+## [3.4.0](https://git.ole-hartwig.eu/yasrt/cli/compare/3.3.2...3.4.0) (2026-09-11)
 
 ### :sparkles: Features
 
-- something new (aaa1111)
+* something new ([aaa1111](https://git.ole-hartwig.eu/yasrt/cli/commit/aaa11110000000000000000000000000000000))
 
-## [3.3.2] - 2026-08-01
+## [3.3.2] (2026-08-01)
 
 ### :bug: Fixes
 
-- old fix (999zzzz)
+* old fix (999zzzz)

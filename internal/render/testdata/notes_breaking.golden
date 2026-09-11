@@ -1,16 +1,16 @@
 ### :boom: BREAKING CHANGES
 
-- drop the preset mode
-- .releaserc.yml is no longer read
+* drop the preset mode
+* .releaserc.yml is no longer read
 
 ### :sparkles: Features
 
-- drop the preset mode (aaa1111)
+* drop the preset mode ([aaa1111](https://git.ole-hartwig.eu/yasrt/cli/commit/aaa11110000000000000000000000000000000))
 
 ### :bug: Fixes
 
-- unrelated fix (bbb2222)
+* unrelated fix ([bbb2222](https://git.ole-hartwig.eu/yasrt/cli/commit/bbb22220000000000000000000000000000000))
 
 ### :zap: Refactor
 
-- rework loader (ccc3333)
+* rework loader ([ccc3333](https://git.ole-hartwig.eu/yasrt/cli/commit/ccc33330000000000000000000000000000000))

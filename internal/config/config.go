@@ -49,8 +49,12 @@ const (
 	VersionPlaceholder = "${version}"
 	// TagPlaceholder matters wherever the two differ: with a v-prefixed
 	// tag_format, "2.5.1" and "v2.5.1" are not interchangeable, and the
-	// estate's renovate trigger sends the tag, not the version.
+	// estate's dependency-update trigger sends the tag, not the version.
 	TagPlaceholder = "${tag}"
+	// NotesPlaceholder puts the rendered release notes in a template. The npm
+	// preset this replaces writes them into the release-commit body, so
+	// without it every migrated repository would quietly lose them.
+	NotesPlaceholder = "${notes}"
 )
 
 type Config struct {
@@ -312,7 +316,10 @@ func (c *Config) applyDefaults() {
 		c.ReleaseCommit.Enabled = &t
 	}
 	if c.ReleaseCommit.Message == "" {
-		c.ReleaseCommit.Message = "chore(" + ReleaseScope + "): " + VersionPlaceholder
+		// Subject, blank line, notes — the shape the npm preset produces, so a
+		// migrated repository's history does not change shape at the cutover.
+		c.ReleaseCommit.Message = "chore(" + ReleaseScope + "): " + VersionPlaceholder +
+			"\n\n" + NotesPlaceholder
 	}
 	if c.ReleaseCommit.Assets == nil {
 		c.ReleaseCommit.Assets = []string{c.Changelog.File}
@@ -451,9 +458,22 @@ func (c *Config) VersionFromTag(tag string) (semver.Version, bool) {
 	return v, true
 }
 
-// Expand substitutes ${version} and ${tag} in a template such as the
+// Vars are the values a template may refer to.
+type Vars struct {
+	Version semver.Version
+	Tag     string
+	Notes   string
+}
+
+// Expand substitutes ${version}, ${tag} and ${notes} in a template such as the
 // release-commit message, the GitLab release name, or a trigger variable.
+func (vars Vars) Expand(tmpl string) string {
+	out := strings.ReplaceAll(tmpl, VersionPlaceholder, vars.Version.String())
+	out = strings.ReplaceAll(out, TagPlaceholder, vars.Tag)
+	return strings.ReplaceAll(out, NotesPlaceholder, vars.Notes)
+}
+
+// Expand is the shorthand for templates that cannot refer to the notes.
 func Expand(tmpl string, v semver.Version, tag string) string {
-	out := strings.ReplaceAll(tmpl, VersionPlaceholder, v.String())
-	return strings.ReplaceAll(out, TagPlaceholder, tag)
+	return Vars{Version: v, Tag: tag}.Expand(tmpl)
 }

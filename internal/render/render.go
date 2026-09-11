@@ -25,8 +25,11 @@ const BreakingTitle = ":boom: BREAKING CHANGES"
 
 // Input is everything the renderer needs.
 type Input struct {
-	Version  semver.Version
+	Version semver.Version
+	// Previous and Tag are the predecessor and current tag as written in the
+	// repository, used for the comparison link in the heading.
 	Previous string
+	Tag      string
 	Date     time.Time
 	Decision rules.Decision
 	Sections []config.Section
@@ -46,7 +49,7 @@ func Notes(in Input) string {
 	if notes := in.Decision.Breaking(); len(notes) > 0 {
 		fmt.Fprintf(&b, "### %s\n\n", BreakingTitle)
 		for _, n := range notes {
-			fmt.Fprintf(&b, "- %s\n", strings.ReplaceAll(strings.TrimSpace(n), "\n", " "))
+			fmt.Fprintf(&b, "* %s\n", strings.ReplaceAll(strings.TrimSpace(n), "\n", " "))
 		}
 		b.WriteString("\n")
 	}
@@ -71,17 +74,27 @@ func Notes(in Input) string {
 	return strings.TrimRight(b.String(), "\n") + "\n"
 }
 
-// entry renders one commit line: "- scope: description (sha) (refs)".
+// entry renders one commit line in the shape conventional-changelog produces,
+// because that is what every CHANGELOG.md in this estate already contains:
+//
+//   - **scope:** description ([abc1234](<url>/-/commit/<sha>))
+//
+// Matching it matters more than preferring another shape: a migrated
+// repository's changelog would otherwise change format halfway down the file.
 func entry(c conventional.Commit, projectURL string) string {
 	var b strings.Builder
-	b.WriteString("- ")
+	b.WriteString("* ")
 	if c.Scope != "" {
-		b.WriteString(c.Scope)
-		b.WriteString(": ")
+		fmt.Fprintf(&b, "**%s:** ", c.Scope)
 	}
 	b.WriteString(c.Description)
 	if c.ShortSHA != "" {
-		fmt.Fprintf(&b, " (%s)", c.ShortSHA)
+		if projectURL != "" {
+			fmt.Fprintf(&b, " ([%s](%s/commit/%s))",
+				c.ShortSHA, strings.TrimRight(projectURL, "/"), c.SHA)
+		} else {
+			fmt.Fprintf(&b, " (%s)", c.ShortSHA)
+		}
 	}
 	if refs := references(c, projectURL); refs != "" {
 		fmt.Fprintf(&b, " (%s)", refs)
@@ -124,26 +137,49 @@ func link(kind, number, projectURL string) string {
 	}
 	base := strings.TrimRight(projectURL, "/")
 	switch kind {
+	// Without the /-/ infix, matching the links the estate's existing
+	// changelogs carry. GitLab serves both forms; consistency inside a file
+	// that is about to gain entries from a different tool matters more.
 	case "#":
-		return fmt.Sprintf("[%s](%s/-/issues/%s)", text, base, number)
+		return fmt.Sprintf("[%s](%s/issues/%s)", text, base, number)
 	case "!":
-		return fmt.Sprintf("[%s](%s/-/merge_requests/%s)", text, base, number)
+		return fmt.Sprintf("[%s](%s/merge_requests/%s)", text, base, number)
 	}
 	return text
 }
 
-// ChangelogHeading is the block that introduces one release in CHANGELOG.md.
+// ChangelogHeading introduces one release, in the shape the estate's existing
+// changelogs use: the version links to the comparison against its predecessor,
+// and the date is parenthesised.
+//
+//	## [1.1.1](<url>/-/compare/1.1.0...1.1.1) (2026-08-24)
+//
+// Without a project URL or a predecessor there is nothing to compare against,
+// and the heading degrades to the plain form rather than linking nowhere.
 func ChangelogHeading(v semver.Version, date time.Time) string {
-	return fmt.Sprintf("## [%s] - %s", v, date.Format(time.DateOnly))
+	return headingFor(v, date, "", "", "")
+}
+
+func headingFor(v semver.Version, date time.Time, projectURL, previousTag, tag string) string {
+	day := date.Format(time.DateOnly)
+	if projectURL == "" || previousTag == "" || tag == "" {
+		return fmt.Sprintf("## [%s] (%s)", v, day)
+	}
+	return fmt.Sprintf("## [%s](%s/compare/%s...%s) (%s)",
+		v, strings.TrimRight(projectURL, "/"), previousTag, tag, day)
 }
 
 // PrependChangelog inserts a release block at the top of an existing changelog,
 // below any document title, and creates the document when it is missing.
 func PrependChangelog(existing string, in Input, notes string) string {
-	block := ChangelogHeading(in.Version, in.Date) + "\n\n" + strings.TrimRight(notes, "\n") + "\n"
+	block := headingFor(in.Version, in.Date, in.ProjectURL, in.Previous, in.Tag) +
+		"\n\n" + strings.TrimRight(notes, "\n") + "\n"
 
+	// No document title: the estate's changelogs start straight at the first
+	// release heading, and adding one would put a line above every existing
+	// file's history at the moment it migrates.
 	if strings.TrimSpace(existing) == "" {
-		return "# Changelog\n\n" + block
+		return block
 	}
 
 	head, rest := splitTitle(existing)

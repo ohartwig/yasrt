@@ -165,10 +165,10 @@ func TestFullRelease(t *testing.T) {
 		t.Fatal("CHANGELOG.md should have been written")
 	}
 	cl := s.tr.Read("CHANGELOG.md")
-	if !strings.Contains(cl, "## [1.1.0] - 2026-09-11") {
+	if !strings.Contains(cl, "## [1.1.0](https://git/x/compare/1.0.0...1.1.0) (2026-09-11)") {
 		t.Errorf("changelog:\n%s", cl)
 	}
-	if !strings.Contains(cl, "[#7](https://git/x/-/issues/7)") {
+	if !strings.Contains(cl, "[#7](https://git/x/issues/7)") {
 		t.Errorf("issue reference missing:\n%s", cl)
 	}
 	if s.gl.creates.Load() != 1 {
@@ -456,7 +456,7 @@ func TestReleaseNotesReachGitLab(t *testing.T) {
 	run(t, o)
 
 	desc, _ := body["description"].(string)
-	if !strings.Contains(desc, ":sparkles: Features") || !strings.Contains(desc, "api: add the thing") {
+	if !strings.Contains(desc, ":sparkles: Features") || !strings.Contains(desc, "**api:** add the thing") {
 		t.Errorf("description = %q", desc)
 	}
 }
@@ -686,5 +686,44 @@ func TestSignAutoToleratesGarbageKey(t *testing.T) {
 	}
 	if tags := s.tr.RemoteTags(); !slices.Contains(tags, "1.1.0") {
 		t.Errorf("the release should still happen: %q", tags)
+	}
+}
+
+// The npm preset writes the release notes into the release-commit body. A
+// migrated repository would otherwise lose them, which is a change in the shape
+// of its history rather than a missing feature anybody would notice at once.
+func TestReleaseCommitCarriesTheNotes(t *testing.T) {
+	s := setup(t, "product: image\n")
+	run(t, s.opts())
+
+	body := s.tr.Git("log", "-1", "--format=%B")
+	if !strings.HasPrefix(body, "chore(release): 1.1.0") {
+		t.Errorf("subject = %q", body)
+	}
+	if !strings.Contains(body, ":sparkles: Features") || !strings.Contains(body, "**api:** add the thing") {
+		t.Errorf("the notes should be in the commit body:\n%s", body)
+	}
+}
+
+// The git plugin this replaces accepts globs in `assets`; a repository listing
+// docs/*.md would otherwise stage nothing and commit nothing, silently.
+func TestReleaseCommitAssetsAcceptGlobs(t *testing.T) {
+	s := setup(t, `
+product: image
+release_commit:
+  assets: ["CHANGELOG.md", "release-notes/*.md"]
+`)
+	// Left uncommitted on purpose: the point is that the release commit picks
+	// them up by glob, which it cannot do if they are already committed and
+	// therefore unchanged.
+	s.tr.Write("release-notes/one.md", "first\n")
+	s.tr.Write("release-notes/two.md", "second\n")
+
+	run(t, s.opts())
+	files := s.tr.Git("show", "--name-only", "--format=", "HEAD")
+	for _, want := range []string{"CHANGELOG.md", "release-notes/one.md", "release-notes/two.md"} {
+		if !strings.Contains(files, want) {
+			t.Errorf("%s missing from the release commit:\n%s", want, files)
+		}
 	}
 }

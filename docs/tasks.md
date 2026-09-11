@@ -6,10 +6,11 @@ phase, tasks are ordered by dependency unless marked *(parallel)*.
 
 Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked
 
-Status as of 2026-09-11: P0–P6 are implemented and green locally (`go test ./...`,
-78 tests across 11 packages). Everything that needs a real GitLab project, a
-runner, or another repository is blocked or unverified and marked as such —
-those are the boundary of what could be done without touching the estate.
+Status as of 2026-09-11: **P0–P6 and P11 are done and proven in production.**
+`yasrt/cli` released itself as **1.0.0** through its own pipeline: tag on the
+built commit, release commit on top, GitLab release with rendered notes,
+binaries in the generic package registry. What remains needs other repositories
+or estate-wide decisions, and is marked `[ ]`, `[~]` or `[!]`.
 
 ---
 
@@ -202,8 +203,10 @@ those are the boundary of what could be done without touching the estate.
 
 ## P6 — Dogfooding
 
-- [x] **T-090** YASRT's own `.gitlab-ci.yml` uses the new template.
-      *Done when:* a `feat:` on `main` produces a tag, a GitLab release and a signed image.
+- [x] **T-090** YASRT's own `.gitlab-ci.yml` releases yasrt with yasrt.
+      *Done 2026-09-11:* pipeline 202019 cut `1.0.0` — annotated tag on the built commit
+      `16b55aa1`, `chore(release): 1.0.0` on top of it, GitLab release with rendered notes,
+      binaries in the generic package registry. Image build still to come (T-074).
 - [x] **T-091** `.yasrt.yaml` for this repo (`product: custom`, explicit `non_release_paths`).
       *Done when:* a docs-only commit ends in `not-deliverable`.
 

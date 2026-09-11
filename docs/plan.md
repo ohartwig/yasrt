@@ -234,7 +234,15 @@ P3–P4 and buy a week of calendar time.
 
 ## 6. Risks
 
-**R1 — Protected tags versus the job token.** *(open, blocks P8)*
+**R1 — Protected tags versus the job token.** *(partially answered, still blocks P8)*
+
+*Evidence, 2026-09-11:* on `yasrt/cli` the job token **did** push an annotated tag to a
+`*` protected-tag rule set to Maintainer, with `ci_push_repository_for_job_token_allowed`
+enabled — and the push started no pipeline, confirming loop guard 1 empirically. But the
+pipeline was triggered by the Owner, so this proves the mechanism works, **not** that it works
+for a Developer merging to `main`, which is the case the estate actually needs. The decision
+below is therefore still open.
+
 `igs/engineering/commit-signing-policy.md` reserves protected-tag creation to the Maintainer-level
 `release-bot` identity and bars service accounts from it. A `CI_JOB_TOKEN` push acts as the
 *triggering user*, so under SPEC §7 the tag is created by whoever merged to `main` — a Developer,

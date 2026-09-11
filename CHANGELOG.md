@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.0] - 2026-09-11
+
+### :sparkles: Features
+
+- layered configuration, so central defaults are possible again (ca55593)
+
 ## [1.1.0] - 2026-09-11
 
 ### :sparkles: Features

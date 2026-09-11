@@ -7,7 +7,7 @@ spec:
     stage:
       default: test
     yasrt-image:
-      default: "registry.ole-hartwig.eu/yasrt/cli:1"
+      default: "registry.ole-hartwig.eu/devops/images/yasrt:1"
     config-path:
       default: ".yasrt.yaml"
 ---

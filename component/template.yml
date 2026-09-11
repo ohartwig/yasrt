@@ -18,7 +18,7 @@ spec:
       default: release
       description: Stage for the publishing job. Must come after the build.
     yasrt-image:
-      default: "registry.ole-hartwig.eu/yasrt/cli:1"
+      default: "registry.ole-hartwig.eu/devops/images/yasrt:1"
       description: Image carrying the yasrt binary, git and gpg.
     config-path:
       default: ".yasrt.yaml"

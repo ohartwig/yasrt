@@ -48,8 +48,12 @@ include:
 lint:golangci:
   <<: *go-base
   stage: test
+  # Pinned v2.6.2 could not read Go 1.27 export data ("export data version 4 is
+  # greater than maximum supported version 2") and reported the whole standard
+  # library as unimportable. Tracking latest until a release is known to
+  # understand 1.27; advisory either way, which is why it may fail.
   script:
-    - go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.6.2 run --timeout 5m
+    - go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest run --timeout 5m
   allow_failure: true
 
 # The estate's stated gate is 75 % line coverage (engineering/quality-gates.md).
@@ -76,6 +80,10 @@ test:coverage:gate:
 test:govulncheck:
   <<: *go-base
   stage: test
+  # vuln.go.dev is IPv4-only and the general pool is IPv6-only, so the database
+  # fetch times out there. az1a is the estate's IPv4-capable pool, used for the
+  # same reason by devops/images/code-signing and deploy-opkssh.
+  tags: [az1a]
   script:
     - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 

@@ -21,9 +21,9 @@ GitLab CI/CD component. It
 ## 2. Non-goals
 
 - Monorepos with several independently versioned packages.
-- Prerelease / maintenance branch models (`next`, `beta`, `1.x`) — **not in the MVP**, but a
-  planned later phase. `-rc.N` is live in `gsb11/extensions/*` and `moselwal-packages/*`, so
-  prerelease support is the precondition for removing the old component, not a permanent exclusion.
+- Maintenance branch models (`1.x`, `2.x`). Prereleases **are** supported as of v0.3 — see
+  §5.3 — because `-rc.N` is live in `gsb11/extensions/*` and `moselwal-packages/*` and those
+  repositories could not otherwise migrate.
 - Plugin system **as a package chain**. semantic-release's plugins are npm
   packages resolved at run time, which is what produces the 384–516 unpinned
   transitive dependencies and the ~21 s `npm install` this tool exists to
@@ -171,6 +171,37 @@ after_release:             # F9 – non-fatal
         RELEASED_PACKAGE: "${CI_PROJECT_PATH}"
         RELEASED_VERSION: "${tag}"
 ```
+
+### 5.3 Prereleases
+
+```yaml
+versioning:
+  prereleases:
+    develop: rc        # branch develop cuts 2.5.0-rc.1, 2.5.0-rc.2, …
+```
+
+A branch listed here cuts prereleases under the given identifier; every other
+branch cuts stable releases. Both live shapes in this estate are the same
+mechanism seen from either side: `moselwal-packages/*` cuts stable from `main`
+and `-rc` from `develop`, `gsb11/extensions/*` cuts `-rc` from `main` and stable
+from `release`.
+
+Two ranges are involved, deliberately:
+
+- The **core version** is computed from the last **stable** release, because a
+  prerelease accumulates everything since the last real release. A `feat` that
+  appeared in `rc.1` still makes the core a minor bump at `rc.2`.
+- The **notes and the changed paths** are computed from the last release of
+  **any** kind, so `rc.2` describes what is new since `rc.1` rather than
+  repeating it.
+
+The counter resets when the core moves: `1.1.0-rc.1` followed by a breaking
+change yields `2.0.0-rc.1`, not `2.0.0-rc.2`. A stable release ignores
+prerelease tags when choosing its baseline, so `1.0.0` → `1.1.0-rc.1` → `1.1.0`.
+
+The branch is taken from `--branch`, else `CI_COMMIT_BRANCH`, else git. In CI the
+checkout is usually detached, which is why the environment is the authority and
+git only the fallback.
 
 ### 5.2 Hooks (extension points)
 

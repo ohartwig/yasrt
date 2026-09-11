@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -94,6 +95,19 @@ func (h Hooks) For(e hooks.Event) []hooks.Hook {
 type Versioning struct {
 	Initial     string `yaml:"initial"`
 	MajorOnZero *bool  `yaml:"major_on_zero"`
+	// Prereleases maps a branch to the identifier its releases carry, e.g.
+	// {develop: rc} to cut 2.5.0-rc.1 from develop. A branch that is absent
+	// cuts stable releases. Both shapes live in this estate: gsb11 puts the
+	// prerelease on main and cuts stable from `release`, moselwal-packages
+	// does the opposite.
+	Prereleases map[string]string `yaml:"prereleases"`
+}
+
+// PrereleaseFor returns the identifier a branch releases under, and whether the
+// branch is a prerelease branch at all.
+func (c *Config) PrereleaseFor(branch string) (string, bool) {
+	id, ok := c.Versioning.Prereleases[branch]
+	return id, ok && id != ""
 }
 
 // Rule maps a commit to a release size. The first rule that matches a commit
@@ -167,6 +181,10 @@ type Trigger struct {
 	Ref       string            `yaml:"ref"`
 	Variables map[string]string `yaml:"variables"`
 }
+
+// prereleaseIdentifierRE is SemVer's alphanumeric identifier, minus the dot:
+// yasrt appends ".N" itself, so the configured part must not carry one.
+var prereleaseIdentifierRE = regexp.MustCompile(`^[0-9A-Za-z-]+$`)
 
 // DefaultRules is the rule set from SPEC §5. Anything not listed produces no
 // release, which is why build and revert are absent: both are allowed commit
@@ -357,6 +375,15 @@ func (c *Config) validate() error {
 	case SignAuto, SignRequired, SignOff:
 	default:
 		errs = append(errs, fmt.Errorf("release_commit.sign: %q is not auto, required or off", c.ReleaseCommit.Sign))
+	}
+	for branch, id := range c.Versioning.Prereleases {
+		if branch == "" {
+			errs = append(errs, errors.New("versioning.prereleases: a branch name cannot be empty"))
+		}
+		if !prereleaseIdentifierRE.MatchString(id) {
+			errs = append(errs, fmt.Errorf(
+				"versioning.prereleases[%s]: %q is not a valid identifier (letters, digits and hyphens)", branch, id))
+		}
 	}
 	for _, e := range hooks.Events() {
 		for i, h := range c.Hooks.For(e) {

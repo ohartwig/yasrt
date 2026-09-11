@@ -360,3 +360,139 @@ func TestSquashMergeWithoutConventionalTitle(t *testing.T) {
 		t.Errorf("the commit should be recorded as non-conforming: %+v", res.Decision.NonConforming)
 	}
 }
+
+// Prereleases (plan.md P10). Two shapes are live in this estate: gsb11 cuts
+// -rc from main and stable from `release`, moselwal-packages cuts stable from
+// main and -rc from develop. Both are the same mechanism seen from either side.
+func TestPrereleases(t *testing.T) {
+	cfgSrc := "product: package\nversioning:\n  prereleases:\n    develop: rc\n"
+
+	newRepo := func(t *testing.T) *testrepo.Repo {
+		tr := testrepo.New(t)
+		tr.CommitFile("src/main.go", "1", "feat: first")
+		tr.Tag("v1.0.0")
+		return tr
+	}
+
+	t.Run("first rc from a prerelease branch", func(t *testing.T) {
+		tr := newRepo(t)
+		tr.Git("checkout", "-q", "-b", "develop")
+		tr.CommitFile("src/b.go", "2", "feat: something new")
+
+		res := run(t, tr, cfg(t, cfgSrc), analyze.Options{Branch: "develop"})
+		if res.Status != analyze.StatusRelease {
+			t.Fatalf("status = %s", res.Status)
+		}
+		if res.Version.String() != "1.1.0-rc.1" {
+			t.Errorf("version = %s, want 1.1.0-rc.1", res.Version)
+		}
+		if res.Tag != "v1.1.0-rc.1" {
+			t.Errorf("tag = %q", res.Tag)
+		}
+		if res.Prerelease != "rc" {
+			t.Errorf("prerelease = %q", res.Prerelease)
+		}
+	})
+
+	t.Run("the counter increments while the core stays", func(t *testing.T) {
+		tr := newRepo(t)
+		tr.Git("checkout", "-q", "-b", "develop")
+		tr.CommitFile("src/b.go", "2", "feat: something new")
+		tr.Tag("v1.1.0-rc.1")
+		tr.CommitFile("src/c.go", "3", "fix: a follow-up")
+
+		res := run(t, tr, cfg(t, cfgSrc), analyze.Options{Branch: "develop"})
+		if res.Version.String() != "1.1.0-rc.2" {
+			t.Errorf("version = %s, want 1.1.0-rc.2", res.Version)
+		}
+		// rc.2 describes what is new since rc.1, not since the last stable.
+		if len(res.Decision.Counted) != 1 {
+			t.Errorf("notes should cover only the new commit, got %d", len(res.Decision.Counted))
+		}
+	})
+
+	t.Run("a bigger bump moves the core and resets the counter", func(t *testing.T) {
+		tr := newRepo(t)
+		tr.Git("checkout", "-q", "-b", "develop")
+		tr.CommitFile("src/b.go", "2", "feat: something new")
+		tr.Tag("v1.1.0-rc.1")
+		tr.CommitFile("src/c.go", "3", "feat!: breaking now")
+
+		res := run(t, tr, cfg(t, cfgSrc), analyze.Options{Branch: "develop"})
+		if res.Version.String() != "2.0.0-rc.1" {
+			t.Errorf("version = %s, want 2.0.0-rc.1", res.Version)
+		}
+	})
+
+	t.Run("the core accumulates everything since the last stable", func(t *testing.T) {
+		tr := newRepo(t)
+		tr.Git("checkout", "-q", "-b", "develop")
+		// The feat is only in the rc.1 range; rc.2 sees a docs commit alone,
+		// but the core must still be 1.1.0 rather than falling back to a patch.
+		tr.CommitFile("src/b.go", "2", "feat: something new")
+		tr.Tag("v1.1.0-rc.1")
+		tr.CommitFile("src/c.go", "3", "fix: small")
+
+		res := run(t, tr, cfg(t, cfgSrc), analyze.Options{Branch: "develop"})
+		if res.Version.String() != "1.1.0-rc.2" {
+			t.Errorf("version = %s — the minor from rc.1 must not be forgotten", res.Version)
+		}
+	})
+
+	t.Run("stable branch ignores prerelease tags for the core", func(t *testing.T) {
+		tr := newRepo(t)
+		tr.CommitFile("src/b.go", "2", "feat: something new")
+		tr.Tag("v1.1.0-rc.1")
+		tr.CommitFile("src/c.go", "3", "fix: ready")
+
+		res := run(t, tr, cfg(t, cfgSrc), analyze.Options{Branch: "main"})
+		if res.Prerelease != "" {
+			t.Errorf("main is not a prerelease branch, got %q", res.Prerelease)
+		}
+		if res.Version.String() != "1.1.0" {
+			t.Errorf("version = %s, want the stable 1.1.0", res.Version)
+		}
+		if res.Previous != "v1.0.0" {
+			t.Errorf("previous = %q — the stable baseline, not the rc", res.Previous)
+		}
+	})
+
+	t.Run("gsb11 shape: rc on main, stable on release", func(t *testing.T) {
+		src := "product: extension\nversioning:\n  prereleases:\n    main: rc\n"
+		tr := newRepo(t)
+		tr.CommitFile("src/b.go", "2", "feat: something new")
+
+		onMain := run(t, tr, cfg(t, src), analyze.Options{Branch: "main"})
+		if onMain.Version.String() != "1.1.0-rc.1" {
+			t.Errorf("main = %s, want a prerelease", onMain.Version)
+		}
+		onRelease := run(t, tr, cfg(t, src), analyze.Options{Branch: "release"})
+		if onRelease.Version.String() != "1.1.0" {
+			t.Errorf("release = %s, want stable", onRelease.Version)
+		}
+	})
+
+	t.Run("an unconfigured branch is stable", func(t *testing.T) {
+		tr := newRepo(t)
+		tr.CommitFile("src/b.go", "2", "feat: x")
+		res := run(t, tr, cfg(t, cfgSrc), analyze.Options{Branch: "feature/anything"})
+		if res.Prerelease != "" || res.Version.String() != "1.1.0" {
+			t.Errorf("pre=%q version=%s", res.Prerelease, res.Version)
+		}
+	})
+
+	t.Run("prerelease ordering holds against the stable release", func(t *testing.T) {
+		tr := newRepo(t)
+		tr.Git("checkout", "-q", "-b", "develop")
+		tr.CommitFile("src/b.go", "2", "feat: x")
+		tr.Tag("v1.1.0-rc.1")
+		tr.Tag("v1.1.0")
+		tr.CommitFile("src/c.go", "3", "fix: y")
+
+		// 1.1.0 beats 1.1.0-rc.1, so the next rc builds on 1.1.0.
+		res := run(t, tr, cfg(t, cfgSrc), analyze.Options{Branch: "develop"})
+		if res.Version.String() != "1.1.1-rc.1" {
+			t.Errorf("version = %s, want 1.1.1-rc.1", res.Version)
+		}
+	})
+}

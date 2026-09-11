@@ -45,6 +45,14 @@
           "description": "When false, a breaking change below 1.0.0 bumps the minor version instead.",
           "type": "boolean",
           "default": true
+        },
+        "prereleases": {
+          "type": "object",
+          "description": "Maps a branch to the prerelease identifier its releases carry, e.g. {develop: rc}. Branches not listed cut stable releases.",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[0-9A-Za-z-]+$"
+          }
         }
       }
     },

@@ -91,6 +91,11 @@ type Summary struct {
 	Bump     string `json:"bump,omitzero"`
 	Reason   string `json:"reason,omitzero"`
 	Commit   string `json:"commit"`
+	// Prerelease and Branch are reported here rather than in the dotenv
+	// contract: the tag already encodes the identifier, and every dotenv key
+	// is an interface other people's pipelines switch on.
+	Prerelease string `json:"prerelease,omitzero"`
+	Branch     string `json:"branch,omitzero"`
 
 	Deliverable bool     `json:"deliverable"`
 	Delivering  []string `json:"delivering,omitzero"`
@@ -115,6 +120,8 @@ func BuildSummary(r *analyze.Result) Summary {
 		Bump:          e.Get(KeyBump),
 		Reason:        e.Get(KeyReason),
 		Commit:        r.Commit,
+		Prerelease:    r.Prerelease,
+		Branch:        r.Branch,
 		Deliverable:   r.Delivery.Deliverable,
 		Delivering:    r.Delivery.Delivering,
 		Excluded:      r.Delivery.Excluded,

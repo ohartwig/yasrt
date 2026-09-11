@@ -9,8 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"regexp"
 	"slices"
+	"strconv"
+	"strings"
 
 	"git.ole-hartwig.eu/yasrt/cli/internal/config"
 	"git.ole-hartwig.eu/yasrt/cli/internal/conventional"
@@ -50,6 +53,9 @@ type Options struct {
 	Force                string // major | minor | patch
 	Version              string // explicit x.y.z
 	IgnoreDeliverability bool
+	// Branch names the branch being released. It decides whether this is a
+	// prerelease, per versioning.prereleases. Empty means: ask git.
+	Branch string
 	// IgnoreExistingTag skips the already-released short circuit. `release`
 	// needs it: when it resumes after a partial failure the tag is already
 	// published, but the notes still have to be rendered from the same range.
@@ -68,6 +74,11 @@ type Result struct {
 
 	PreviousVersion semver.Version
 	HasPrevious     bool
+
+	// Prerelease is the identifier this release carries, empty for a stable
+	// release. Branch is the branch it was decided for.
+	Prerelease string
+	Branch     string
 
 	Decision rules.Decision
 	Delivery deliver.Result
@@ -126,14 +137,29 @@ func Run(repo *git.Repo, cfg *config.Config, opts Options, log *slog.Logger) (*R
 	if opts.IgnoreExistingTag {
 		excluded = pointing
 	}
-	lastTag, lastVersion, hasPrevious, warnings, err := lastRelease(repo, cfg, ref, excluded)
+	base, err := findBaseline(repo, cfg, ref, excluded)
 	if err != nil {
 		return nil, err
 	}
-	res.Previous, res.PreviousVersion, res.HasPrevious = lastTag, lastVersion, hasPrevious
-	res.Warnings = warnings
+	res.Warnings = base.Warnings
 
-	raw, err := repo.Log(lastTag, ref)
+	res.Branch = resolveBranch(repo, opts.Branch)
+	preID, isPrerelease := cfg.PrereleaseFor(res.Branch)
+	if isPrerelease {
+		res.Prerelease = preID
+	}
+
+	// The notes and the changed paths are measured from the last release of any
+	// kind; the version core is computed from the last stable one. On a stable
+	// branch those are the same tag.
+	notesFrom, bumpFrom := base.StableTag, base.StableTag
+	res.Previous, res.PreviousVersion, res.HasPrevious = base.StableTag, base.Stable, base.HasStable
+	if isPrerelease {
+		notesFrom = base.AnyTag
+		res.Previous, res.PreviousVersion, res.HasPrevious = base.AnyTag, base.Any, base.HasAny
+	}
+
+	raw, err := repo.Log(notesFrom, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -147,6 +173,24 @@ func Run(repo *git.Repo, cfg *config.Config, opts Options, log *slog.Logger) (*R
 	res.Bump = res.Decision.Bump
 	res.Reason = res.Decision.Reason
 
+	// A prerelease accumulates everything since the last stable release, so the
+	// core version follows from that wider range even though the notes do not.
+	if isPrerelease && notesFrom != bumpFrom {
+		wider, err := repo.Log(bumpFrom, ref)
+		if err != nil {
+			return nil, err
+		}
+		parsedWider := make([]conventional.Commit, 0, len(wider))
+		for _, rc := range wider {
+			parsedWider = append(parsedWider, conventional.Parse(rc.SHA, rc.ShortSHA, rc.AuthorName, rc.AuthorEmail, rc.Message))
+		}
+		coreDecision := rules.Evaluate(parsedWider, cfg)
+		res.Bump = semver.Max(res.Bump, coreDecision.Bump)
+		if res.Reason == "" {
+			res.Reason = coreDecision.Reason
+		}
+	}
+
 	// Overrides. Both count as forced, and neither skips deliverability.
 	explicit := false
 	if opts.Version != "" {
@@ -154,12 +198,12 @@ func Run(repo *git.Repo, cfg *config.Config, opts Options, log *slog.Logger) (*R
 		if err != nil {
 			return nil, fmt.Errorf("--version: %w", err)
 		}
-		if hasPrevious && !lastVersion.Less(v) {
-			return nil, fmt.Errorf("%w: %s is not higher than %s", ErrVersionNotHigher, v, lastVersion)
+		if res.HasPrevious && !res.PreviousVersion.Less(v) {
+			return nil, fmt.Errorf("%w: %s is not higher than %s", ErrVersionNotHigher, v, res.PreviousVersion)
 		}
 		res.Version, explicit = v, true
 		res.Reason = ReasonForced
-		res.Bump = inferBump(lastVersion, v, hasPrevious)
+		res.Bump = inferBump(res.PreviousVersion, v, res.HasPrevious)
 	} else if opts.Force != "" {
 		b, err := semver.ParseBump(opts.Force)
 		if err != nil {
@@ -177,19 +221,24 @@ func Run(repo *git.Repo, cfg *config.Config, opts Options, log *slog.Logger) (*R
 	}
 
 	if !explicit {
-		if hasPrevious {
-			res.Version = lastVersion.Next(res.Bump, cfg.MajorOnZero())
+		var core semver.Version
+		if base.HasStable {
+			core = base.Stable.Next(res.Bump, cfg.MajorOnZero())
 		} else {
 			// First release: the configured starting point, not a bump of it.
 			v, err := semver.Parse(cfg.Versioning.Initial)
 			if err != nil {
 				return nil, err
 			}
-			res.Version = v
+			core = v
 		}
+		if isPrerelease {
+			core = nextPrerelease(core, preID, base.Prereleases)
+		}
+		res.Version = core
 	}
 
-	changed, err := repo.ChangedPaths(lastTag, ref)
+	changed, err := repo.ChangedPaths(notesFrom, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -210,31 +259,61 @@ func Run(repo *git.Repo, cfg *config.Config, opts Options, log *slog.Logger) (*R
 	return res, nil
 }
 
-// lastRelease finds the highest tag in tag_format that is reachable from ref.
+// baseline is what the repository already released, split by kind.
+//
+// Stable and prerelease baselines answer different questions. The core version
+// of a prerelease is computed from the last *stable* release, because an rc
+// accumulates everything since the last real release; the notes and the changed
+// paths are computed from the last release of *any* kind, because rc.2 should
+// describe what is new since rc.1 rather than repeat it.
+type baseline struct {
+	StableTag string
+	Stable    semver.Version
+	HasStable bool
+
+	AnyTag string
+	Any    semver.Version
+	HasAny bool
+
+	// Prereleases are the matching prerelease versions reachable from the ref,
+	// used to find the next counter.
+	Prereleases []semver.Version
+
+	Warnings []string
+}
+
+// findBaseline collects the tags in tag_format that are reachable from ref.
 // Reachability matters: a tag on an unmerged branch is not a predecessor.
-func lastRelease(repo *git.Repo, cfg *config.Config, ref string, excludeTags []string) (tag string, v semver.Version, ok bool, warnings []string, err error) {
+func findBaseline(repo *git.Repo, cfg *config.Config, ref string, excludeTags []string) (baseline, error) {
+	var b baseline
+
 	merged, err := repo.MergedTags(ref)
 	if err != nil {
-		return "", semver.Version{}, false, nil, err
+		return b, err
 	}
-	var matched int
 	for _, t := range merged {
 		if slices.Contains(excludeTags, t) {
 			continue
 		}
-		cand, isOurs := cfg.VersionFromTag(t)
+		v, isOurs := cfg.VersionFromTag(t)
 		if !isOurs {
 			continue
 		}
-		matched++
-		if !ok || v.Less(cand) {
-			tag, v, ok = t, cand, true
+		if !b.HasAny || b.Any.Less(v) {
+			b.AnyTag, b.Any, b.HasAny = t, v, true
 		}
+		if v.Pre == "" {
+			if !b.HasStable || b.Stable.Less(v) {
+				b.StableTag, b.Stable, b.HasStable = t, v, true
+			}
+			continue
+		}
+		b.Prereleases = append(b.Prereleases, v)
 	}
 
 	all, err := repo.AllTags()
 	if err != nil {
-		return "", semver.Version{}, false, nil, err
+		return b, err
 	}
 	var foreign []string
 	for _, t := range all {
@@ -246,11 +325,52 @@ func lastRelease(repo *git.Repo, cfg *config.Config, ref string, excludeTags []s
 		}
 	}
 	if len(foreign) > 0 {
-		warnings = append(warnings, fmt.Sprintf(
+		b.Warnings = append(b.Warnings, fmt.Sprintf(
 			"%d tag(s) look like versions but do not match tag_format %q (ignored): %v",
 			len(foreign), cfg.TagFormatString(), foreign))
 	}
-	return tag, v, ok, warnings, nil
+	return b, nil
+}
+
+// nextPrerelease turns a core version into the next counter for an identifier:
+// 2.5.0 with rc becomes 2.5.0-rc.1, or rc.4 when rc.3 already exists.
+func nextPrerelease(core semver.Version, identifier string, existing []semver.Version) semver.Version {
+	highest := uint64(0)
+	prefix := identifier + "."
+	for _, v := range existing {
+		if v.Major != core.Major || v.Minor != core.Minor || v.Patch != core.Patch {
+			continue
+		}
+		rest, ok := strings.CutPrefix(v.Pre, prefix)
+		if !ok {
+			continue
+		}
+		n, err := strconv.ParseUint(rest, 10, 64)
+		if err != nil {
+			continue
+		}
+		if n > highest {
+			highest = n
+		}
+	}
+	core.Pre = fmt.Sprintf("%s.%d", identifier, highest+1)
+	return core
+}
+
+// resolveBranch decides which branch this analysis is for. In CI the checkout
+// is usually detached, so the environment is the authority and git is the
+// fallback rather than the other way round.
+func resolveBranch(repo *git.Repo, explicit string) string {
+	if explicit != "" {
+		return explicit
+	}
+	if b := os.Getenv("CI_COMMIT_BRANCH"); b != "" {
+		return b
+	}
+	if b, err := repo.CurrentBranch(); err == nil {
+		return b
+	}
+	return ""
 }
 
 // inferBump reports which component an explicit --version moved, so that

@@ -278,12 +278,11 @@ or estate-wide decisions, and is marked `[ ]`, `[~]` or `[!]`.
 
 ## P10 — Prereleases, then decommissioning
 
-- [ ] **T-130** Design prerelease support for the two live shapes: `main` with `prerelease: rc`, and a
-      `develop`/`release` branch model.
-      *Done when:* the design is agreed and SPEC §2 is amended.
-- [ ] **T-131** Implement `-rc.N` versioning, including the interaction with `tag_format` and with
-      `already-released`.
-      *Done when:* a test repo cuts `v2.4.0-rc.1` then `v2.4.0-rc.2` then `v2.4.0`.
+- [x] **T-130** Prerelease support for both live shapes, via `versioning.prereleases` mapping a
+      branch to an identifier. SPEC §2 amended and §5.3 added.
+- [x] **T-131** `-rc.N` versioning implemented. The core comes from the last stable release, the
+      notes from the last release of any kind, and the counter resets when the core moves.
+      Eight scenarios covered, including both estate shapes and `1.0.0 → 1.1.0-rc.1 → 1.1.0`.
 - [ ] **T-132** Port `cleanup-release-tags` behaviour or confirm the existing template still covers it.
       *Done when:* RC tags and releases are removed on merge to the default branch.
 - [ ] **T-133** Migrate the prerelease repos.

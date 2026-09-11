@@ -227,3 +227,44 @@ func TestSingleFileStillWorks(t *testing.T) {
 		t.Errorf("product = %q", c.Product)
 	}
 }
+
+// The CI component always writes the defaults file, even when it has nothing
+// to say, so an empty layer must merge to nothing rather than fail.
+func TestEmptyLayerIsHarmless(t *testing.T) {
+	dir := t.TempDir()
+	empty := write(t, dir, "defaults.yaml", "")
+	repo := write(t, dir, ".yasrt.yaml", "product: image\n")
+
+	c, err := LoadLayered([]string{empty}, repo)
+	if err != nil {
+		t.Fatalf("an empty defaults layer must merge to nothing: %v", err)
+	}
+	if c.Product != ProductImage {
+		t.Errorf("product = %q", c.Product)
+	}
+}
+
+// And with nothing anywhere, the error names what is missing rather than
+// complaining about the empty file.
+func TestEmptyLayerAndNoRepoFileReportsTheMissingProduct(t *testing.T) {
+	dir := t.TempDir()
+	empty := write(t, dir, "defaults.yaml", "")
+
+	_, err := LoadLayered([]string{empty}, filepath.Join(dir, ".yasrt.yaml"))
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if !strings.Contains(err.Error(), "product") {
+		t.Errorf("the message should name product: %v", err)
+	}
+}
+
+// A comment-only defaults file is the same case with a different shape.
+func TestCommentOnlyLayerIsHarmless(t *testing.T) {
+	dir := t.TempDir()
+	c1 := write(t, dir, "defaults.yaml", "# nothing to configure here\n")
+	repo := write(t, dir, ".yasrt.yaml", "product: package\n")
+	if _, err := LoadLayered([]string{c1}, repo); err != nil {
+		t.Fatalf("a comment-only layer must merge to nothing: %v", err)
+	}
+}

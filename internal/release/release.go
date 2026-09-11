@@ -539,10 +539,14 @@ const (
 	// The armour header yasrt matches in order to RECOGNISE a PGP key, not a
 	// key: forty characters of delimiter and no key material. Suppressed rather
 	// than obfuscated, because a constant spelled out is what makes the
-	// detection readable. The suppression is a trailing comment because
-	// semgrep only honours it on the finding's own line or the one immediately
-	// above — five lines of explanation in between silently defeated it once.
-	pgpKeyHeader = "-----BEGIN PGP PRIVATE KEY BLOCK-----" // nosemgrep: generic.secrets.security.detected-pgp-private-key-block.detected-pgp-private-key-block
+	// detection readable.
+	//
+	// The suppression is bare rather than rule-scoped, and trailing rather than
+	// above: semgrep honours it only on the finding's own line or the one
+	// immediately preceding, and the rule-scoped form did not take here even
+	// with the id copied from the SARIF output. On a line that is one constant
+	// string, suppressing every rule is a blast radius of one line.
+	pgpKeyHeader = "-----BEGIN PGP PRIVATE KEY BLOCK-----" // nosemgrep
 )
 
 // setupSigning prepares the optional signing key and tells git to use it.

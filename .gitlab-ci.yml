@@ -34,6 +34,13 @@ include:
     key:
       files: [go.sum]
     paths: [.go/pkg/mod]
+  before_script:
+    # devops/images/golang carries the Go toolchain and build-base, no git.
+    # yasrt's tests drive the real git binary on purpose — every rule it
+    # implements is defined against git's own behaviour, so a fake would only
+    # prove the fake works. Installing it here keeps the shared image
+    # unchanged; if a second Go repository needs it, it belongs in the image.
+    - apk add --no-cache git
 
 # yasrt has no golangci-lint or govulncheck precedent in this estate to inherit;
 # both are introduced here rather than in the shared Go component, so the two
@@ -71,6 +78,13 @@ test:govulncheck:
   stage: test
   script:
     - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+# The shared Go component cannot know that this repository's tests need git;
+# its own before_script only changes directory, so both have to be restated.
+test:go:
+  before_script:
+    - apk add --no-cache git
+    - cd .
 
 # ---------------------------------------------------------------------------
 # The release handshake.

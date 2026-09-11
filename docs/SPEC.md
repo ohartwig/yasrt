@@ -44,7 +44,7 @@ GitLab CI/CD component. It
 
 ### 4.1 Overview
 
-```
+```text
 ┌──────────────────────── GitLab pipeline (default branch) ────────────────────────┐
 │                                                                                  │
 │  version ──► build/publish ──► release                                           │
@@ -193,7 +193,7 @@ Comparing `<lastTag>..HEAD` is the fix, and it is a behaviour change to be measu
 
 **Output** (`--output .release.env`, plus `--json` to stdout):
 
-```
+```text
 RELEASE_STATUS=release        # release | no-bump | not-deliverable | already-released
 RELEASE_VERSION=3.4.0
 RELEASE_TAG=3.4.0

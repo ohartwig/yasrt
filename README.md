@@ -1,6 +1,6 @@
 <!--
 SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
-SPDX-License-Identifier: Apache-2.0
+SPDX-License-Identifier: MIT
 -->
 
 # yasrt

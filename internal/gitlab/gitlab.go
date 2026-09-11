@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package gitlab talks to the three GitLab endpoints yasrt needs: create a
 // release, attach a release link, and trigger a pipeline in another project.

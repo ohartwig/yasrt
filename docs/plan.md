@@ -168,6 +168,7 @@ From `gitlab-profile` (the OKF handbook / IGS bundle):
 | D7 | Prereleases are a later phase, not a non-goal | Otherwise the old template can never be removed (§2.6) |
 | D8 | Keyed cosign against AWS KMS | Keyless Fulcio cannot work against this instance (§2.8) |
 | D9 | Wolfi base, `buildkit-image-build` with inherited signing | The only image pattern the estate has; gets SBOM and signature for free (§2.9) |
+| D10 | **MIT** | On the handbook's approved list (`igs/compliance/open-source-compliance.md`), no obligations for internal use or customer deliverables, and the lowest possible adoption barrier for a tool other teams may want to run. Both dependencies are permissive, so there is nothing to be compatible with. AGPL was considered and rejected: its distinguishing clause is network-use copyleft, and a CI binary serves nobody over a network, so it would add adoption cost for a protection that never applies — and the handbook flags it for legal review. `release-tools` being GPL-3.0 creates no conflict: it contains YAML that invokes the binary, it does not link it |
 
 D3, D5, D7 and D8 contradict `SPEC.md` as first drafted; the corrections are applied there.
 

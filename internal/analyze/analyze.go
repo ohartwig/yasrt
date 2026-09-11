@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package analyze implements `yasrt next`: it reads a repository and decides
 // whether, and to what, it should be released. It writes nothing.

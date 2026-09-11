@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 // Package logging configures the logger and guarantees that credentials never
 // reach it. Masking lives in the handler rather than at each call site, because

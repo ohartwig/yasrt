@@ -316,6 +316,22 @@ as a red release pipeline in somebody else's repository:
    current `sqlite-libs` against its glibc, which only surfaced once gpg was
    actually installed and run.
 
+And one that took five occurrences to catch, because I kept filtering away the
+evidence I had added: **`testrepo` configured its git identity with
+`git config`, which environment variables outrank.** This session sets
+`GIT_AUTHOR_EMAIL`, so test commits silently carried the agent's identity
+instead of `test@example.invalid` — but only after the session had itself run
+git, which is why it never reproduced when looked for and always appeared right
+after a rebase. The diagnostics that would have shown it were in place for four
+of the five failures; every time, the command I ran piped them through
+`grep FAIL` and discarded them. The fixture now forces `GIT_AUTHOR_*` and
+`GIT_COMMITTER_*` in the command environment, and the fix is verified by
+running the suite with a hostile identity exported: it fails without, passes
+with.
+
+Same family as the rest: a setting that looks authoritative, silently outranked
+by something higher-precedence, with no error anywhere.
+
 Plus one that is about the process rather than the product: **a semgrep
 suppression that does not suppress looks exactly like one that does.** The rule
 fired on the constant yasrt uses to *recognise* PGP keys. Two attempts were

@@ -55,6 +55,17 @@ func (r *Repo) git(args ...string) (string, error) {
 		"GIT_TERMINAL_PROMPT=0",
 		"GIT_AUTHOR_DATE=2026-01-01T00:00:00Z",
 		"GIT_COMMITTER_DATE=2026-01-01T00:00:00Z",
+		// The identity has to be forced here, not merely written with
+		// `git config`. Environment variables outrank repository config, so an
+		// ambient GIT_AUTHOR_EMAIL — which a CI job or an agent session may
+		// well have set — silently replaces the identity these repositories
+		// think they configured. That produced an intermittent failure that
+		// only ever appeared after this session had run git itself, and never
+		// when it was looked for.
+		"GIT_AUTHOR_NAME=Test Bot",
+		"GIT_AUTHOR_EMAIL=test@example.invalid",
+		"GIT_COMMITTER_NAME=Test Bot",
+		"GIT_COMMITTER_EMAIL=test@example.invalid",
 		"LC_ALL=C",
 	)
 	out, err := cmd.CombinedOutput()

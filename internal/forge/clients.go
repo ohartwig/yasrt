@@ -10,8 +10,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -124,6 +126,61 @@ func (r *rest) attempt(ctx context.Context, method, path string, body, out any) 
 	return json.Unmarshal(raw, out)
 }
 
+// raw sends a request whose body is not JSON and whose URL may live on
+// another host, as GitHub's upload endpoint does. Uploads are not retried:
+// the body is a stream, and a half-sent file is not something to send twice.
+func (r *rest) raw(ctx context.Context, method, fullURL, contentType string, body io.Reader, size int64, out any) error {
+	req, err := http.NewRequestWithContext(ctx, method, fullURL, body)
+	if err != nil {
+		return err
+	}
+	if size >= 0 {
+		req.ContentLength = size
+	}
+	req.Header.Set("Content-Type", contentType)
+	req.Header.Set(r.authKey, r.authVal)
+	if r.accept != "" {
+		req.Header.Set("Accept", r.accept)
+	}
+	client := r.http
+	if client == nil {
+		client = &http.Client{Timeout: 10 * time.Minute}
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	rawBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return &APIError{Status: resp.StatusCode, Method: method, Path: fullURL, Body: string(rawBody)}
+	}
+	if readErr != nil {
+		return readErr
+	}
+	if out == nil || len(bytes.TrimSpace(rawBody)) == 0 {
+		return nil
+	}
+	return json.Unmarshal(rawBody, out)
+}
+
+func openUpload(up Upload) (*os.File, int64, error) {
+	f, err := os.Open(up.Path)
+	if err != nil {
+		return nil, 0, err
+	}
+	st, err := f.Stat()
+	if err != nil {
+		_ = f.Close()
+		return nil, 0, err
+	}
+	if st.IsDir() {
+		_ = f.Close()
+		return nil, 0, fmt.Errorf("%s is a directory", up.Path)
+	}
+	return f, st.Size(), nil
+}
+
 func notFound(err error) bool {
 	var apiErr *APIError
 	return errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound
@@ -202,6 +259,31 @@ func (c *gitlabClient) AddLinks(ctx context.Context, tag string, links []Link) e
 	return errors.Join(errs...)
 }
 
+// UploadAsset publishes the file to the generic package registry, which is
+// the one upload target a job token may write to. The download URL is the
+// same path, so the returned link points straight at it.
+func (c *gitlabClient) UploadAsset(ctx context.Context, _ *Release, up Upload) (Link, error) {
+	f, size, err := openUpload(up)
+	if err != nil {
+		return Link{}, err
+	}
+	defer func() { _ = f.Close() }()
+	pkg := up.Package
+	if pkg == "" {
+		pkg = "release"
+	}
+	u := strings.TrimRight(c.rest.apiURL, "/") + c.path("packages/generic/"+
+		url.PathEscape(pkg)+"/"+url.PathEscape(up.Version)+"/"+url.PathEscape(up.Name))
+	if err := c.rest.raw(ctx, http.MethodPut, u, "application/octet-stream", f, size, nil); err != nil {
+		return Link{}, fmt.Errorf("upload %q: %w", up.Name, err)
+	}
+	lt := up.LinkType
+	if lt == "" {
+		lt = "package"
+	}
+	return Link{Name: up.Name, URL: u, LinkType: lt}, nil
+}
+
 // TriggerPipeline starts a pipeline in another project. GitLab only.
 func (c *gitlabClient) TriggerPipeline(ctx context.Context, project, ref string, vars map[string]string) (string, error) {
 	req := struct {
@@ -259,9 +341,17 @@ func (c *ghClient) path(suffix string) string {
 }
 
 type ghRelease struct {
-	TagName string `json:"tag_name"`
-	Name    string `json:"name,omitzero"`
-	HTMLURL string `json:"html_url,omitzero"`
+	ID        int64  `json:"id,omitzero"`
+	TagName   string `json:"tag_name"`
+	Name      string `json:"name,omitzero"`
+	HTMLURL   string `json:"html_url,omitzero"`
+	UploadURL string `json:"upload_url,omitzero"`
+}
+
+func (r ghRelease) release() *Release {
+	// GitHub's upload_url carries an RFC 6570 template suffix, {?name,label}.
+	up, _, _ := strings.Cut(r.UploadURL, "{")
+	return &Release{TagName: r.TagName, Name: r.Name, URL: r.HTMLURL, ID: r.ID, UploadURL: up}
 }
 
 func (c *ghClient) GetRelease(ctx context.Context, tag string) (*Release, bool, error) {
@@ -273,7 +363,7 @@ func (c *ghClient) GetRelease(ctx context.Context, tag string) (*Release, bool, 
 	if err != nil {
 		return nil, false, err
 	}
-	return &Release{TagName: out.TagName, Name: out.Name, URL: out.HTMLURL}, true, nil
+	return out.release(), true, nil
 }
 
 func (c *ghClient) CreateRelease(ctx context.Context, tag, name, body string) (*Release, error) {
@@ -286,7 +376,57 @@ func (c *ghClient) CreateRelease(ctx context.Context, tag, name, body string) (*
 	if err := c.rest.do(ctx, http.MethodPost, c.path(""), req, &out); err != nil {
 		return nil, err
 	}
-	return &Release{TagName: out.TagName, Name: out.Name, URL: out.HTMLURL}, nil
+	return out.release(), nil
+}
+
+// UploadAsset attaches the file to the release. GitHub takes the raw body on
+// its upload host; Forgejo takes a multipart form on the API host. Both answer
+// with the browser download URL.
+func (c *ghClient) UploadAsset(ctx context.Context, rel *Release, up Upload) (Link, error) {
+	if rel == nil || rel.ID == 0 {
+		return Link{}, fmt.Errorf("upload %q: the release must exist before assets can be attached", up.Name)
+	}
+	f, size, err := openUpload(up)
+	if err != nil {
+		return Link{}, err
+	}
+	defer func() { _ = f.Close() }()
+
+	var out struct {
+		URL string `json:"browser_download_url,omitzero"`
+	}
+	switch c.kind {
+	case GitHub:
+		base := rel.UploadURL
+		if base == "" {
+			return Link{}, fmt.Errorf("upload %q: the release carries no upload URL", up.Name)
+		}
+		u := base + "?name=" + url.QueryEscape(up.Name)
+		if err := c.rest.raw(ctx, http.MethodPost, u, "application/octet-stream", f, size, &out); err != nil {
+			return Link{}, fmt.Errorf("upload %q: %w", up.Name, err)
+		}
+	default:
+		// Forgejo wants the file as a form field named attachment. Building the
+		// form in memory keeps this simple; release assets are not gigabytes.
+		var buf bytes.Buffer
+		mw := multipart.NewWriter(&buf)
+		part, err := mw.CreateFormFile("attachment", up.Name)
+		if err != nil {
+			return Link{}, err
+		}
+		if _, err := io.Copy(part, f); err != nil {
+			return Link{}, err
+		}
+		if err := mw.Close(); err != nil {
+			return Link{}, err
+		}
+		u := strings.TrimRight(c.rest.apiURL, "/") + c.path(fmt.Sprintf("/%d/assets", rel.ID)) +
+			"?name=" + url.QueryEscape(up.Name)
+		if err := c.rest.raw(ctx, http.MethodPost, u, mw.FormDataContentType(), &buf, int64(buf.Len()), &out); err != nil {
+			return Link{}, fmt.Errorf("upload %q: %w", up.Name, err)
+		}
+	}
+	return Link{Name: up.Name, URL: out.URL, LinkType: up.LinkType}, nil
 }
 
 func (c *ghClient) AddLinks(ctx context.Context, tag string, links []Link) error {

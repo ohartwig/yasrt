@@ -229,7 +229,21 @@ func TestContextCancellationStopsHooks(t *testing.T) {
 }
 
 func TestEventsCoverEveryHookPoint(t *testing.T) {
-	if got := len(hooks.Events()); got != 4 {
+	if got := len(hooks.Events()); got != 5 {
 		t.Errorf("Events() = %d", got)
+	}
+}
+
+// A failure hook that fails itself must not hide the original failure.
+func TestFailingOnFailureHookIsNotFatal(t *testing.T) {
+	dir := t.TempDir()
+	run := script(t, dir, "fail.sh", "#!/bin/sh\nexit 3\n")
+	res, err := hooks.Run(context.Background(), dir, hooks.OnFailure,
+		[]hooks.Hook{{Run: run}}, ctxFor(), discard)
+	if err != nil {
+		t.Fatalf("on_failure must not be fatal: %v", err)
+	}
+	if len(res) != 1 || res[0].ExitCode != 3 || res[0].Fatal {
+		t.Errorf("res = %+v", res)
 	}
 }

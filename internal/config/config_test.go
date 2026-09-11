@@ -151,6 +151,11 @@ func TestValidation(t *testing.T) {
 		{"bad sign", "product: image\nrelease_commit:\n  sign: maybe\n", "release_commit.sign"},
 		{"trigger without ref", "product: image\nafter_release:\n  triggers:\n    - project: a/b\n", "ref: required"},
 		{"unsupported version", "version: 2\nproduct: image\n", "not supported"},
+		{"asset with url and path", "product: image\ngitlab_release:\n  assets:\n    - name: x\n      url: https://a\n      path: dist/x\n", "not both"},
+		{"asset with neither", "product: image\ngitlab_release:\n  assets:\n    - name: x\n", "url or path is required"},
+		{"link without name", "product: image\ngitlab_release:\n  assets:\n    - url: https://a\n", "name: required"},
+		{"absolute upload path", "product: image\ngitlab_release:\n  assets:\n    - path: /etc/passwd\n", "relative to the repository"},
+		{"on_failure hook without run", "product: image\nhooks:\n  on_failure:\n    - name: x\n", "hooks.on_failure[0].run"},
 		{"unknown key", "product: image\nprodukt: image\n", "field produkt not found"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

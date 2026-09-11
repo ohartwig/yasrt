@@ -51,6 +51,28 @@ type Release struct {
 	TagName string
 	Name    string
 	URL     string
+	// ID is what GitHub and Forgejo address uploads by. GitLab addresses a
+	// release by its tag and leaves it zero.
+	ID int64
+	// UploadURL is GitHub's upload endpoint for this release, which lives on a
+	// different host than the API. Empty elsewhere.
+	UploadURL string
+}
+
+// Upload is a local file that becomes part of a release. GitLab stores it in
+// the generic package registry under Package/Version and links it from the
+// release; GitHub and Forgejo attach it to the release object directly.
+type Upload struct {
+	// Name is the file name on the platform.
+	Name string
+	// Path is the local file.
+	Path string
+	// Package and Version address the generic package on GitLab. Ignored
+	// elsewhere.
+	Package string
+	Version string
+	// LinkType classifies the resulting GitLab release link.
+	LinkType string
 }
 
 // Link is a URL attached to a release.
@@ -77,6 +99,10 @@ type Client interface {
 	AddLinks(ctx context.Context, tag string, links []Link) error
 	// SupportsLinks is false where links must go into the body instead.
 	SupportsLinks() bool
+	// UploadAsset stores a file and returns where it can be fetched from. On
+	// GitLab this runs before the release exists and the returned link is
+	// attached with AddLinks; elsewhere it needs the created release.
+	UploadAsset(ctx context.Context, rel *Release, up Upload) (Link, error)
 	// SupportsTriggers is false where after_release.triggers cannot be
 	// delivered; only GitLab has the pipeline-trigger endpoint yasrt uses.
 	SupportsTriggers() bool

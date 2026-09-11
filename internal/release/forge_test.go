@@ -9,7 +9,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -25,11 +27,37 @@ type fakeGitHubish struct {
 	lastBody atomic.Pointer[string]
 	lastAuth atomic.Pointer[string]
 	srv      *httptest.Server
+
+	mu     sync.Mutex
+	assets map[string]string // name -> content-type of the upload request
 }
 
 func newFakeGitHubish(t *testing.T) *fakeGitHubish {
-	f := &fakeGitHubish{releases: map[string]bool{}}
+	f := &fakeGitHubish{releases: map[string]bool{}, assets: map[string]string{}}
 	mux := http.NewServeMux()
+	record := func(w http.ResponseWriter, r *http.Request) {
+		name := r.URL.Query().Get("name")
+		if name == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		ct := r.Header.Get("Content-Type")
+		if strings.HasPrefix(ct, "multipart/form-data") {
+			if err := r.ParseMultipartForm(1 << 20); err != nil || r.MultipartForm.File["attachment"] == nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+		}
+		f.mu.Lock()
+		f.assets[name] = ct
+		f.mu.Unlock()
+		w.WriteHeader(http.StatusCreated)
+		io.WriteString(w, `{"browser_download_url":"https://dl/`+name+`"}`)
+	}
+	// GitHub's upload host; the release's upload_url points here.
+	mux.HandleFunc("POST /uploads/releases/{id}/assets", record)
+	// Forgejo attaches on the API host.
+	mux.HandleFunc("POST /repos/{owner}/{repo}/releases/{id}/assets", record)
 	mux.HandleFunc("GET /repos/{owner}/{repo}/releases/tags/{tag}", func(w http.ResponseWriter, r *http.Request) {
 		tag := r.PathValue("tag")
 		if !f.releases[tag] {
@@ -51,12 +79,8 @@ func newFakeGitHubish(t *testing.T) *fakeGitHubish {
 		f.releases[tag] = true
 		f.creates.Add(1)
 		w.WriteHeader(http.StatusCreated)
-		io.WriteString(w, `{"tag_name":"`+tag+`","html_url":"https://gh/o/r/releases/tag/`+tag+`"}`)
-	})
-	// Neither platform has a bare-URL link endpoint; a call here is a bug.
-	mux.HandleFunc("POST /repos/{owner}/{repo}/releases/{id}/assets", func(w http.ResponseWriter, r *http.Request) {
-		t.Errorf("unexpected asset upload on %s", r.URL.Path)
-		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, `{"id":7,"tag_name":"`+tag+`","html_url":"https://gh/o/r/releases/tag/`+tag+`",`+
+			`"upload_url":"`+f.srv.URL+`/uploads/releases/7/assets{?name,label}"}`)
 	})
 	f.srv = httptest.NewServer(mux)
 	t.Cleanup(f.srv.Close)
@@ -170,5 +194,147 @@ func TestChangelogLinksFollowTheForge(t *testing.T) {
 	}
 	if strings.Contains(cl, "/-/") {
 		t.Errorf("GitLab-style path on GitHub:\n%s", cl)
+	}
+}
+
+// Uploads: GitLab stores the file in the generic package registry and links
+// it; GitHub takes the raw body on its upload host; Forgejo a multipart form.
+func TestReleaseUploadsAssets(t *testing.T) {
+	const cfg = `product: image
+gitlab_release:
+  assets:
+    - path: "dist/*.tar.gz"
+      package: yasrt
+    - path: "SHA256SUMS"
+      name: "checksums-${version}.txt"
+      link_type: other
+`
+	prepare := func(t *testing.T) *scenario {
+		s := setup(t, cfg)
+		s.tr.Write("dist/yasrt-linux-amd64.tar.gz", "amd64")
+		s.tr.Write("dist/yasrt-linux-arm64.tar.gz", "arm64")
+		s.tr.Write("SHA256SUMS", "sums")
+		return s
+	}
+
+	t.Run("gitlab", func(t *testing.T) {
+		s := prepare(t)
+		rep := run(t, s.opts())
+		if got := stepStatus(rep, "release"); got != release.StepDone {
+			t.Fatalf("release step = %q", got)
+		}
+		s.gl.mu.Lock()
+		defer s.gl.mu.Unlock()
+		want := map[string]string{
+			"yasrt/1.1.0/yasrt-linux-amd64.tar.gz": "amd64",
+			"yasrt/1.1.0/yasrt-linux-arm64.tar.gz": "arm64",
+			"release/1.1.0/checksums-1.1.0.txt":    "sums",
+		}
+		for k, v := range want {
+			if string(s.gl.uploads[k]) != v {
+				t.Errorf("upload %s = %q, want %q", k, s.gl.uploads[k], v)
+			}
+		}
+		if len(s.gl.linkURLs) != 3 {
+			t.Fatalf("links = %q", s.gl.linkURLs)
+		}
+		for _, u := range s.gl.linkURLs {
+			if !strings.Contains(u, "/packages/generic/") {
+				t.Errorf("link should point at the package: %s", u)
+			}
+		}
+	})
+
+	for _, kind := range []forge.Kind{forge.GitHub, forge.Forgejo} {
+		t.Run(string(kind), func(t *testing.T) {
+			s := prepare(t)
+			f := newFakeGitHubish(t)
+			o := s.opts()
+			o.Forge = f.client(t, kind)
+			o.URLs = forge.URLs{Kind: kind, Base: "https://gh/o/r"}
+			rep := run(t, o)
+			if got := stepStatus(rep, "release"); got != release.StepDone {
+				t.Fatalf("release step = %q", got)
+			}
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			if len(f.assets) != 3 {
+				t.Fatalf("assets = %v", f.assets)
+			}
+			ct := f.assets["checksums-1.1.0.txt"]
+			switch kind {
+			case forge.GitHub:
+				if ct != "application/octet-stream" {
+					t.Errorf("github upload content-type = %q", ct)
+				}
+			case forge.Forgejo:
+				if !strings.HasPrefix(ct, "multipart/form-data") {
+					t.Errorf("forgejo upload content-type = %q", ct)
+				}
+			}
+			// Uploads are attached, not listed; the body lists only URL links.
+			if strings.Contains(*f.lastBody.Load(), "### Assets") {
+				t.Errorf("uploads must not be listed as links:\n%s", *f.lastBody.Load())
+			}
+		})
+	}
+
+	t.Run("a path that matches nothing fails before the release exists", func(t *testing.T) {
+		s := setup(t, cfg) // no dist/ files written
+		_, err := release.Run(context.Background(), s.opts())
+		if err == nil || !strings.Contains(err.Error(), "matches no file") {
+			t.Fatalf("err = %v", err)
+		}
+		if s.gl.creates.Load() != 0 {
+			t.Error("the release must not be created when an asset is missing")
+		}
+	})
+}
+
+// on_failure hooks are told what failed, so a person can be. They run for the
+// failure and never turn it into a success.
+func TestOnFailureHookIsToldWhatFailed(t *testing.T) {
+	s := setup(t, `
+product: image
+hooks:
+  on_failure:
+    - run: ./notify.sh
+`)
+	s.tr.Write("notify.sh", "#!/bin/sh\nprintf '%s|%s|%s' \"$YASRT_EVENT\" \"$YASRT_FAILED_STEP\" \"$YASRT_ERROR\" > failure.txt\ncat > payload.json\n")
+	if err := os.Chmod(s.tr.Dir+"/notify.sh", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s.gl.failCreate = 5 // more than the client retries
+
+	rep, err := release.Run(context.Background(), s.opts())
+	if err == nil {
+		t.Fatal("the release should have failed")
+	}
+	got := s.tr.Read("failure.txt")
+	if !strings.HasPrefix(got, "on_failure|release|") || !strings.Contains(got, "500") {
+		t.Errorf("hook saw %q", got)
+	}
+	if p := s.tr.Read("payload.json"); !strings.Contains(p, `"failed_step":"release"`) || !strings.Contains(p, `"error":`) {
+		t.Errorf("payload:\n%s", p)
+	}
+	if len(rep.Hooks) != 1 || rep.Hooks[0].Event != "on_failure" {
+		t.Errorf("report hooks = %+v", rep.Hooks)
+	}
+}
+
+func TestOnFailureHookDoesNotRunOnSuccess(t *testing.T) {
+	s := setup(t, `
+product: image
+hooks:
+  on_failure:
+    - run: ./notify.sh
+`)
+	s.tr.Write("notify.sh", "#!/bin/sh\ntouch failure.txt\n")
+	if err := os.Chmod(s.tr.Dir+"/notify.sh", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run(t, s.opts())
+	if s.tr.Exists("failure.txt") {
+		t.Error("on_failure ran on a successful release")
 	}
 }

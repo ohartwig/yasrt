@@ -149,6 +149,7 @@ deliverability:
 
 changelog:                 # F4/F5
   file: CHANGELOG.md
+  title: ""                # "# Title" written only where the file has none
   sections:                # fixed order
     - { type: feat,     title: ":sparkles: Features" }
     - { type: fix,      title: ":bug: Fixes" }
@@ -167,10 +168,13 @@ release_commit:            # F6
   sign: auto               # auto | required | off  (auto: sign if a key is present)
   author: "KOH Release Bot <release-bot@ole-hartwig.eu>"   # default; overridable
 
-gitlab_release:            # F7
+gitlab_release:            # F7 — the release object on whichever forge
   enabled: true
   name: "${version}"
-  assets: []               # release links, optional
+  assets:                  # optional; links (url) or uploads (path), not both
+    - { name: "image", url: "${CI_REGISTRY_IMAGE}:${version}", link_type: image }
+    - { path: "dist/*.tar.gz", package: yasrt }        # generic package on GitLab,
+                                                       # attached on GitHub/Forgejo
 
 after_release:             # F9 – non-fatal
   triggers:
@@ -281,6 +285,8 @@ hooks:
   after_release:           # last; failures are reported, not fatal
     - run: ./scripts/notify.sh
       allow_failure: true
+  on_failure:              # when `release` is about to exit non-zero
+    - run: ./scripts/page-someone.sh
 ```
 
 A hook is any executable. It receives the release context as JSON on stdin and
@@ -289,8 +295,14 @@ code. `args` are passed verbatim — no shell is involved, so nothing is
 word-split or glob-expanded. Default timeout five minutes.
 
 Failure is fatal for `before_tag` and `after_tag` and non-fatal for
-`after_analysis` and `after_release`; `allow_failure` overrides either way. A
-`before_tag` veto leaves the repository exactly as it was found.
+`after_analysis`, `after_release` and `on_failure`; `allow_failure` overrides
+either way. A `before_tag` veto leaves the repository exactly as it was found.
+
+`on_failure` is the counterpart of semantic-release's `failCmd`: it runs once,
+after the step that failed, with `error` and `failed_step` added to the JSON
+context (`YASRT_ERROR`, `YASRT_FAILED_STEP` in the environment). It cannot
+rescue the release, and its own failure is logged and otherwise ignored — the
+original error is what `release` exits with.
 
 Hooks are never handed a credential. A hook that needs a token reads it from
 its own environment.
@@ -380,9 +392,15 @@ For `no-bump` / `not-deliverable`, `RELEASE_VERSION`/`RELEASE_TAG` are empty.
 4. **Release commit** (F6): commit `CHANGELOG.md`, message from `release_commit.message`; signature per `sign`. Push to the default branch with job token. **After** the tag, so a failure here leaves a complete release behind, not a half one.
 5. **Forge release** (F7, part 2): the platform's release object for the tag,
    with the notes as its description. Skipped when one already exists for the
-   tag. GitLab attaches `gitlab_release.assets` as release links; GitHub and
-   Forgejo have no link endpoint, so the links are appended to the body as an
-   `### Assets` list and the log says so (§7.1).
+   tag. `gitlab_release.assets` entries with `url` become release links —
+   attached on GitLab, appended to the body as an `### Assets` list on GitHub
+   and Forgejo, which have no link endpoint (§7.1). Entries with `path` are
+   uploads: on GitLab the files go to the generic package registry
+   (`<package>/<version>/<file>`, before the release is created, so a failed
+   upload leaves nothing behind) and are linked from the release; on GitHub
+   and Forgejo they are attached to the release after it is created, where a
+   failed upload fails the job but leaves the release — a re-run skips it, so
+   the file is attached by hand.
 6. **Follow-up trigger** (F9): `POST /projects/:id/trigger/pipeline` per entry in `after_release.triggers`, header `JOB-TOKEN`. Errors are logged, exit stays `0`. GitLab only — on the other forges every trigger is reported as undeliverable in `release-report.json` rather than guessed at.
 
 Rationale for the order: steps 3–5 are individually idempotent; a re-run after a failure at step 4 finds the tag, skips 3, repeats 4–6.
@@ -442,6 +460,7 @@ accepted as a synonym for `forgejo`).
 | Push user | `gitlab-ci-token:<token>` | `x-access-token:<token>` | `<token>:x-oauth-basic` |
 | Release | `POST /projects/:id/releases` | `POST /repos/o/r/releases` | same as GitHub |
 | Release links | `assets/links` endpoint | in the body (`### Assets`) | in the body |
+| Uploads (`assets[].path`) | generic package registry, linked | attached to the release (upload host) | attached to the release (multipart) |
 | Pipeline trigger | yes | no — reported, not fatal | no — reported, not fatal |
 | Link shapes | `/commit/`, `/compare/`, `/issues/`, `/merge_requests/` | `/commit/`, `/compare/`, `/issues/`, `/pull/` | as GitHub |
 

@@ -342,6 +342,15 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
       built commits, changelog with compare link, Assets list in the body, trigger reported as
       undeliverable, no workflow re-triggered by the `GITHUB_TOKEN` push. Forgejo still to run.
 
+## P12 — semantic-release parity
+
+- [x] **T-160** `hooks.on_failure` (≈ `failCmd`): runs when `release` is about to exit non-zero,
+      told `error` and `failed_step`; never fatal itself.
+- [x] **T-161** `changelog.title` (≈ `changelogTitle`): written only where the file has no title.
+- [x] **T-162** `gitlab_release.assets[].path` uploads: GitLab generic package registry (linked,
+      before the release exists), GitHub upload host, Forgejo multipart. Globs; a pattern that
+      matches nothing fails before anything is published.
+
 ## Open items carried from the plan
 
 - [x] **T-900** Go coverage threshold: **75 %, blocking**, matching the estate's stated PHP gate.

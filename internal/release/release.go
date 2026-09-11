@@ -21,8 +21,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
+
+	"github.com/bmatcuk/doublestar/v4"
 
 	"git.ole-hartwig.eu/yasrt/cli/internal/analyze"
 	"git.ole-hartwig.eu/yasrt/cli/internal/config"
@@ -150,11 +153,45 @@ func (o *Options) now() time.Time {
 
 // Run executes the release. The returned report is filled in as far as the run
 // got, so a caller can write it even when an error is returned.
+//
+// When the run fails, the on_failure hooks are told what failed before the
+// error is returned. They cannot rescue the release; they exist so that the
+// failure reaches a person.
 func Run(ctx context.Context, o Options) (*Report, error) {
 	log := o.Log
 	if log == nil {
 		log = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
+	rep, err := run(ctx, o, log)
+	if err == nil || o.Config == nil {
+		return rep, err
+	}
+	hs := o.Config.Hooks.For(hooks.OnFailure)
+	if len(hs) == 0 {
+		return rep, err
+	}
+	hctx := hookContext(o.Result, rep.Notes, o.URLs.Base, o.DryRun)
+	hctx.Error = err.Error()
+	hctx.FailedStep = rep.failedStep()
+	hres, hookErr := hooks.Run(ctx, o.Repo.Dir(), hooks.OnFailure, hs, hctx, log)
+	rep.Hooks = append(rep.Hooks, hres...)
+	if hookErr != nil {
+		log.Warn("on_failure hook failed too", "err", hookErr)
+	}
+	return rep, err
+}
+
+// failedStep names the last step that failed, for the on_failure hooks.
+func (r *Report) failedStep() string {
+	for i := len(r.Steps) - 1; i >= 0; i-- {
+		if r.Steps[i].Status == StepFailed {
+			return r.Steps[i].Name
+		}
+	}
+	return ""
+}
+
+func run(ctx context.Context, o Options, log *slog.Logger) (*Report, error) {
 	res, cfg, repo := o.Result, o.Config, o.Repo
 	rep := &Report{Version: res.Version.String(), Tag: res.Tag, TagSHA: res.Commit}
 
@@ -226,6 +263,7 @@ func Run(ctx context.Context, o Options) (*Report, error) {
 		Decision: res.Decision,
 		Sections: cfg.Changelog.Sections,
 		URLs:     o.URLs,
+		Title:    cfg.Changelog.Title,
 	}
 	notes := render.Notes(in)
 	rep.Notes = notes
@@ -434,14 +472,37 @@ func publishRelease(ctx context.Context, o Options, cfg *config.Config, res *ana
 		return existing.URL, StepSkipped, "already exists", nil
 	}
 
-	links := make([]forge.Link, 0, len(cfg.GitLabRelease.Assets))
 	vars := config.Vars{Version: res.Version, Tag: res.Tag}
+	var links []forge.Link
+	var uploads []forge.Upload
 	for _, a := range cfg.GitLabRelease.Assets {
+		if a.IsUpload() {
+			ups, err := expandUploads(o.Repo.Dir(), a, vars)
+			if err != nil {
+				return "", StepFailed, err.Error(), err
+			}
+			uploads = append(uploads, ups...)
+			continue
+		}
 		links = append(links, forge.Link{
 			Name:     vars.Expand(a.Name),
 			URL:      vars.Expand(a.URL),
 			LinkType: a.LinkType,
 		})
+	}
+
+	// GitLab stores uploads independently of the release, so they go first
+	// and become links on it. A failed upload therefore aborts before the
+	// release exists, and a re-run starts clean.
+	if o.Forge.SupportsLinks() {
+		for _, up := range uploads {
+			l, err := o.Forge.UploadAsset(ctx, nil, up)
+			if err != nil {
+				return "", StepFailed, err.Error(), err
+			}
+			log.Info("asset uploaded", "name", up.Name, "url", l.URL)
+			links = append(links, l)
+		}
 	}
 
 	body := notes
@@ -467,7 +528,51 @@ func publishRelease(ctx context.Context, o Options, cfg *config.Config, res *ana
 			log.Warn("release links failed", "err", err)
 		}
 	}
+
+	// GitHub and Forgejo attach files to the release object, so these can
+	// only happen now. A failure here is fatal so the pipeline goes red, but
+	// the release stays: a re-run finds it and skips, so attach the missing
+	// file by hand rather than expecting a retry to do it.
+	if !o.Forge.SupportsLinks() {
+		for _, up := range uploads {
+			l, err := o.Forge.UploadAsset(ctx, rel, up)
+			if err != nil {
+				return rel.URL, StepFailed, err.Error(), err
+			}
+			log.Info("asset attached", "name", up.Name, "url", l.URL)
+		}
+	}
 	return rel.URL, StepDone, rel.URL, nil
+}
+
+// expandUploads resolves one path asset to the files it names. A glob that
+// matches nothing is an error: an asset that was configured and is missing is
+// a broken build, not an empty set.
+func expandUploads(dir string, a config.ReleaseLink, vars config.Vars) ([]forge.Upload, error) {
+	pattern := vars.Expand(a.Path)
+	matches, err := doublestar.Glob(os.DirFS(dir), pattern, doublestar.WithFilesOnly())
+	if err != nil {
+		return nil, fmt.Errorf("gitlab_release.assets: path %q: %w", a.Path, err)
+	}
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("gitlab_release.assets: path %q matches no file", a.Path)
+	}
+	slices.Sort(matches)
+	out := make([]forge.Upload, 0, len(matches))
+	for _, m := range matches {
+		name := filepath.Base(m)
+		if len(matches) == 1 && a.Name != "" {
+			name = vars.Expand(a.Name)
+		}
+		out = append(out, forge.Upload{
+			Name:     name,
+			Path:     filepath.Join(dir, filepath.FromSlash(m)),
+			Package:  vars.Expand(a.Package),
+			Version:  vars.Version.String(),
+			LinkType: a.LinkType,
+		})
+	}
+	return out, nil
 }
 
 func runTriggers(ctx context.Context, o Options, cfg *config.Config, res *analyze.Result,

@@ -27,6 +27,15 @@ include:
       job-name: "lint:ci-yaml"
       targets: ".gitlab-ci.yml"
   - component: ${CI_SERVER_HOST}/devops/ci-cd-components/supply-chain-verify/base-image-pins@2
+  # yasrt releases yasrt through the component that yasrt ships. The image
+  # carries the last released version and cuts the next one, which is what
+  # dogfooding is supposed to mean — and it makes this repository the first
+  # consumer of release-tools/yasrt, so the component is exercised rather than
+  # only the binary.
+  - component: ${CI_SERVER_HOST}/devops/ci-cd-components/release-tools/yasrt@1
+    inputs:
+      stage-version: version
+      stage-release: release
 
 .go-base: &go-base
   image: $GO_IMAGE
@@ -98,18 +107,6 @@ test:go:
 # The release handshake.
 # ---------------------------------------------------------------------------
 
-version:
-  <<: *go-base
-  stage: version
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
-  script:
-    - go run ./cmd/yasrt next --output .release.env
-  artifacts:
-    reports:
-      dotenv: .release.env
-    expire_in: 1 day
-
 # GitLab evaluates rules: at pipeline creation, before .release.env exists, so
 # downstream jobs check RELEASE_STATUS in the script rather than in rules:.
 .needs-release: &needs-release
@@ -159,17 +156,7 @@ upload:package-registry:
           --upload-file "$f" "${PACKAGE_URL}/${RELEASE_VERSION}/${f}"
       done
 
+# The component's release job needs this repository's build, which is named
+# build:binaries here rather than `build`.
 release:
-  <<: *go-base
-  stage: release
   needs: [version, build:binaries, upload:package-registry]
-  resource_group: release
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
-  script:
-    - *needs-release
-    - go run ./cmd/yasrt release
-  artifacts:
-    paths: [release-report.json]
-    when: always
-    expire_in: 30 days

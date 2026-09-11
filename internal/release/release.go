@@ -536,6 +536,11 @@ func authenticatedURL(repo *git.Repo, remote, token string) (string, error) {
 // block are unmistakable, and one fewer knob is one fewer thing to get wrong.
 const (
 	sshKeyHeader = "-----BEGIN OPENSSH PRIVATE KEY-----"
+	// nosemgrep: generic.secrets.security.detected-pgp-private-key-block.detected-pgp-private-key-block
+	// This is the armour header yasrt matches in order to RECOGNISE a PGP key,
+	// not a key. Forty characters of delimiter and no key material. Suppressed
+	// rather than obfuscated, because a constant spelled out is what makes the
+	// detection readable.
 	pgpKeyHeader = "-----BEGIN PGP PRIVATE KEY BLOCK-----"
 )
 

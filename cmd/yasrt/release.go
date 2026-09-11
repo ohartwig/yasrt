@@ -4,6 +4,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"flag"
 	"fmt"
@@ -66,8 +67,10 @@ func cmdRelease(args []string) error {
 		return err
 	}
 
+	// The branch being built, not the default branch: a maintenance release
+	// on 1.x must put its changelog commit on 1.x.
 	if branch == "" {
-		branch = env.DefaultBranch
+		branch = cmp.Or(env.Branch, env.DefaultBranch)
 	}
 
 	res, err := loadResult(repo, cfg, input, log)

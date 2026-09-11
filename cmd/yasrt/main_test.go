@@ -249,6 +249,39 @@ func TestFullHandshakeAndRelease(t *testing.T) {
 	}
 }
 
+// A maintenance release runs on 1.x, and its changelog commit belongs there —
+// not on the default branch, which is what CI_DEFAULT_BRANCH alone would say.
+func TestReleaseCommitLandsOnTheBuiltBranch(t *testing.T) {
+	f := newFixture(t, "product: image\nversioning:\n  maintenance: [\"1.x\"]\n")
+	f.tr.CommitFile("src/main.go", "1", "feat: first")
+	f.tr.Tag("1.0.0")
+	f.tr.CommitFile("src/main.go", "2", "feat: second")
+	f.tr.Tag("2.0.0")
+	bare := f.tr.WithRemote()
+	f.tr.Git("push", "-q", "origin", "--tags")
+	f.tr.Git("checkout", "-q", "-b", "1.x", "1.0.0")
+	f.tr.CommitFile("src/main.go", "1b", "fix: backport")
+	f.tr.Git("push", "-q", "-u", "origin", "1.x")
+	t.Setenv("GITLAB_CI", "true")
+	t.Setenv("CI_COMMIT_BRANCH", "1.x")
+	t.Setenv("CI_DEFAULT_BRANCH", "main")
+
+	if got := f.next("--output", f.envPath); got != exitOK {
+		t.Fatalf("next = %d", got)
+	}
+	if got := f.release("--input", f.envPath, "--report", filepath.Join(t.TempDir(), "r.json")); got != exitOK {
+		t.Fatalf("release = %d", got)
+	}
+	log := f.tr.Git("--git-dir", bare, "log", "--format=%s", "-1", "1.x")
+	if !strings.HasPrefix(log, "chore(release): 1.0.1") {
+		t.Errorf("1.x head = %q, want the release commit", log)
+	}
+	mainLog := f.tr.Git("--git-dir", bare, "log", "--format=%s", "-1", "main")
+	if strings.HasPrefix(mainLog, "chore(release)") {
+		t.Errorf("release commit landed on main: %q", mainLog)
+	}
+}
+
 // The handshake also arrives as environment variables, because that is how a
 // GitLab dotenv report reaches a later job.
 func TestReleaseReadsTheHandshakeFromTheEnvironment(t *testing.T) {

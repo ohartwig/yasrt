@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"git.ole-hartwig.eu/devops/yasrt/internal/git"
-	"git.ole-hartwig.eu/devops/yasrt/internal/testrepo"
+	"git.ole-hartwig.eu/yasrt/cli/internal/git"
+	"git.ole-hartwig.eu/yasrt/cli/internal/testrepo"
 )
 
 func open(t *testing.T, dir string) *git.Repo {

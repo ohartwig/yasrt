@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"git.ole-hartwig.eu/devops/yasrt/internal/analyze"
-	"git.ole-hartwig.eu/devops/yasrt/internal/config"
-	"git.ole-hartwig.eu/devops/yasrt/internal/git"
-	"git.ole-hartwig.eu/devops/yasrt/internal/semver"
-	"git.ole-hartwig.eu/devops/yasrt/internal/testrepo"
+	"git.ole-hartwig.eu/yasrt/cli/internal/analyze"
+	"git.ole-hartwig.eu/yasrt/cli/internal/config"
+	"git.ole-hartwig.eu/yasrt/cli/internal/git"
+	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
+	"git.ole-hartwig.eu/yasrt/cli/internal/testrepo"
 )
 
 var discard = slog.New(slog.NewTextHandler(io.Discard, nil))

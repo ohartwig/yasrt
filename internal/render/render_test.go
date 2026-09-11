@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"git.ole-hartwig.eu/devops/yasrt/internal/config"
-	"git.ole-hartwig.eu/devops/yasrt/internal/conventional"
-	"git.ole-hartwig.eu/devops/yasrt/internal/render"
-	"git.ole-hartwig.eu/devops/yasrt/internal/rules"
-	"git.ole-hartwig.eu/devops/yasrt/internal/semver"
+	"git.ole-hartwig.eu/yasrt/cli/internal/config"
+	"git.ole-hartwig.eu/yasrt/cli/internal/conventional"
+	"git.ole-hartwig.eu/yasrt/cli/internal/render"
+	"git.ole-hartwig.eu/yasrt/cli/internal/rules"
+	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files")
@@ -53,7 +53,7 @@ func input(commits ...conventional.Commit) render.Input {
 		Date:       time.Date(2026, 9, 11, 0, 0, 0, 0, time.UTC),
 		Decision:   rules.Decision{Counted: commits},
 		Sections:   config.DefaultSections(),
-		ProjectURL: "https://git.ole-hartwig.eu/devops/yasrt",
+		ProjectURL: "https://git.ole-hartwig.eu/yasrt/cli",
 	}
 }
 

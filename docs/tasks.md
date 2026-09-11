@@ -17,10 +17,10 @@ those are the boundary of what could be done without touching the estate.
 
 - [x] **T-001** `git init` on `main`, initial commit of the existing `docs/` and `CLAUDE.md`.
       *Done when:* `git log` shows one signed commit on `main`.
-- [!] **T-002** Create the GitLab project `devops/yasrt` on `git.ole-hartwig.eu`, internal visibility,
-      `main` protected, direct pushes blocked.
+- [x] **T-002** Create the top-level group `yasrt` and the project `yasrt/cli` on `git.ole-hartwig.eu`,
+      internal visibility, `main` protected, direct pushes blocked.
       *Done when:* `git push -u origin main` succeeds and the branch is protected.
-- [x] **T-003** `go.mod` with module `git.ole-hartwig.eu/devops/yasrt`, `go 1.27.0`.
+- [x] **T-003** `go.mod` with module `git.ole-hartwig.eu/yasrt/cli`, `go 1.27.0`.
       *Done when:* `go build ./...` succeeds on the `devops/images/golang:1.27` image.
 - [x] **T-004** Copy scaffolding verbatim from `devops/repo-templates`: `lefthook.yml`, `.mise.toml`,
       `.gitsigners` + `.gitsigners.d/`, `.gitlab/CODEOWNERS`, three issue templates, MR template,

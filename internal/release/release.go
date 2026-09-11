@@ -23,11 +23,11 @@ import (
 	"strings"
 	"time"
 
-	"git.ole-hartwig.eu/devops/yasrt/internal/analyze"
-	"git.ole-hartwig.eu/devops/yasrt/internal/config"
-	"git.ole-hartwig.eu/devops/yasrt/internal/git"
-	"git.ole-hartwig.eu/devops/yasrt/internal/gitlab"
-	"git.ole-hartwig.eu/devops/yasrt/internal/render"
+	"git.ole-hartwig.eu/yasrt/cli/internal/analyze"
+	"git.ole-hartwig.eu/yasrt/cli/internal/config"
+	"git.ole-hartwig.eu/yasrt/cli/internal/git"
+	"git.ole-hartwig.eu/yasrt/cli/internal/gitlab"
+	"git.ole-hartwig.eu/yasrt/cli/internal/render"
 )
 
 var (

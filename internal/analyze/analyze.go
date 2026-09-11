@@ -12,12 +12,12 @@ import (
 	"regexp"
 	"slices"
 
-	"git.ole-hartwig.eu/devops/yasrt/internal/config"
-	"git.ole-hartwig.eu/devops/yasrt/internal/conventional"
-	"git.ole-hartwig.eu/devops/yasrt/internal/deliver"
-	"git.ole-hartwig.eu/devops/yasrt/internal/git"
-	"git.ole-hartwig.eu/devops/yasrt/internal/rules"
-	"git.ole-hartwig.eu/devops/yasrt/internal/semver"
+	"git.ole-hartwig.eu/yasrt/cli/internal/config"
+	"git.ole-hartwig.eu/yasrt/cli/internal/conventional"
+	"git.ole-hartwig.eu/yasrt/cli/internal/deliver"
+	"git.ole-hartwig.eu/yasrt/cli/internal/git"
+	"git.ole-hartwig.eu/yasrt/cli/internal/rules"
+	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
 )
 
 // Status is the outcome of an analysis. Every run produces exactly one.

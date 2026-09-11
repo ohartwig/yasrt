@@ -16,7 +16,7 @@ import (
 	"os"
 	"strings"
 
-	"git.ole-hartwig.eu/devops/yasrt/internal/analyze"
+	"git.ole-hartwig.eu/yasrt/cli/internal/analyze"
 )
 
 // Keys of the dotenv contract.

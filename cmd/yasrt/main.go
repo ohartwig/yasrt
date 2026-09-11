@@ -16,9 +16,9 @@ import (
 	"os"
 	"strings"
 
-	"git.ole-hartwig.eu/devops/yasrt/internal/analyze"
-	"git.ole-hartwig.eu/devops/yasrt/internal/logging"
-	"git.ole-hartwig.eu/devops/yasrt/internal/release"
+	"git.ole-hartwig.eu/yasrt/cli/internal/analyze"
+	"git.ole-hartwig.eu/yasrt/cli/internal/logging"
+	"git.ole-hartwig.eu/yasrt/cli/internal/release"
 )
 
 // version is injected at build time with -ldflags "-X main.version=...".

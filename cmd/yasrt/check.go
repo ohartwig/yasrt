@@ -10,9 +10,9 @@ import (
 	"os"
 	"strings"
 
-	"git.ole-hartwig.eu/devops/yasrt/internal/config"
-	"git.ole-hartwig.eu/devops/yasrt/internal/deliver"
-	"git.ole-hartwig.eu/devops/yasrt/internal/git"
+	"git.ole-hartwig.eu/yasrt/cli/internal/config"
+	"git.ole-hartwig.eu/yasrt/cli/internal/deliver"
+	"git.ole-hartwig.eu/yasrt/cli/internal/git"
 )
 
 // checkRef is the throwaway ref used to prove that pushing works. It is deleted

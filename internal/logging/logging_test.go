@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"git.ole-hartwig.eu/devops/yasrt/internal/logging"
+	"git.ole-hartwig.eu/yasrt/cli/internal/logging"
 )
 
 const secret = "glcbt-SUPERSECRETTOKEN"

@@ -1,4 +1,4 @@
-module git.ole-hartwig.eu/devops/yasrt
+module git.ole-hartwig.eu/yasrt/cli
 
 go 1.27.0
 

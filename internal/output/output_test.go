@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"git.ole-hartwig.eu/devops/yasrt/internal/analyze"
-	"git.ole-hartwig.eu/devops/yasrt/internal/deliver"
-	"git.ole-hartwig.eu/devops/yasrt/internal/output"
-	"git.ole-hartwig.eu/devops/yasrt/internal/semver"
+	"git.ole-hartwig.eu/yasrt/cli/internal/analyze"
+	"git.ole-hartwig.eu/yasrt/cli/internal/deliver"
+	"git.ole-hartwig.eu/yasrt/cli/internal/output"
+	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
 )
 
 func releaseResult() *analyze.Result {

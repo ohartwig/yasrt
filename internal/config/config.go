@@ -16,7 +16,7 @@ import (
 	"slices"
 	"strings"
 
-	"git.ole-hartwig.eu/devops/yasrt/internal/semver"
+	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
 	yaml "go.yaml.in/yaml/v3"
 )
 

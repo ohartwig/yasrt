@@ -271,7 +271,7 @@ spec:
   inputs:
     stage-version: { default: version }
     stage-release: { default: release }
-    yasrt-image:   { default: "registry.ole-hartwig.eu/devops/yasrt:1" }
+    yasrt-image:   { default: "registry.ole-hartwig.eu/yasrt/cli:1" }
     config-path:   { default: ".yasrt.yaml" }
     gpg-key-var:   { default: "GPG_SEM_REL_B64" }
 ---
@@ -331,7 +331,7 @@ build:
 
 ```yaml
 release-preview:
-  image: registry.ole-hartwig.eu/devops/yasrt:1
+  image: registry.ole-hartwig.eu/yasrt/cli:1
   variables: { GIT_DEPTH: 0 }
   rules: [{ if: $CI_PIPELINE_SOURCE == "merge_request_event" }]
   script:

@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"git.ole-hartwig.eu/devops/yasrt/internal/gitlab"
+	"git.ole-hartwig.eu/yasrt/cli/internal/gitlab"
 )
 
 func newServer(t *testing.T, h http.HandlerFunc) (*gitlab.Client, *httptest.Server) {

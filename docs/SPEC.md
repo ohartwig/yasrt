@@ -22,31 +22,30 @@ GitLab CI/CD component. It
 
 ## 2. Non-goals
 
-- Monorepos with several independently versioned packages.
-Prereleases (§5.3) and maintenance branches (§5.5) **are** supported. What
-remains out of scope, and why:
+Prereleases (§5.3), maintenance branches (§5.5) and the three forges
+semantic-release publishes to — GitLab, GitHub and Forgejo (§7.1) — **are**
+supported. What remains out of scope, and why:
 
 - **Monorepos with independently versioned packages.** No repository in this
   estate does this: `development/moselwal/dev` carries nested configurations but
   releases as one version series. Building it would change the core model from
   one version per repository to N, for no current consumer.
-- **Forges other than GitLab.** Nine repositories mirror to GitHub or notify
-  Packagist, but every release is cut on GitLab; GitHub is a mirror target, not
-  a release target.
 - **Publishing to registries.** Four components already do this
   (`composer-package-gitlab-release`, `typo3-extension-release`,
   `packagist-submit`, `cleanup-release-tags`), and an `after_release` hook
   covers anything they do not. Duplicating working infrastructure inside the
-  release tool would give two places to be wrong.
-- Plugin system **as a package chain**. semantic-release's plugins are npm
+  release tool would give two places to be wrong. That includes npm, PyPI and
+  OCI registries: those stay with the build jobs.
+- **Plugin system as a package chain.** semantic-release's plugins are npm
   packages resolved at run time, which is what produces the 384–516 unpinned
   transitive dependencies and the ~21 s `npm install` this tool exists to
   remove. Extension instead happens out of process, through **exec hooks**
   (§5.2): yasrt calls any executable at defined points and hands it the release
   context. The binary stays dependency-free and a plugin needs no package
   manager in the release path.
-- Forges other than GitLab.
-- Publishing to registries (npm, PyPI, OCI). That stays with the build jobs.
+- **Forges beyond the three above** (Bitbucket, Azure DevOps). semantic-release
+  does not ship them either; the `forge.Client` interface is small enough that
+  one would be an afternoon, but nobody here has asked.
 
 ## 3. Current state
 
@@ -379,8 +378,12 @@ For `no-bump` / `not-deliverable`, `RELEASE_VERSION`/`RELEASE_TAG` are empty.
    moment it migrates.
 3. **Tag** (F7, part 1): annotated tag on `RELEASE_COMMIT` (not on the release commit — provenance: the tag points at what was built). Push with job token.
 4. **Release commit** (F6): commit `CHANGELOG.md`, message from `release_commit.message`; signature per `sign`. Push to the default branch with job token. **After** the tag, so a failure here leaves a complete release behind, not a half one.
-5. **GitLab release** (F7, part 2): `POST /projects/:id/releases` with `JOB-TOKEN`, `tag_name`, `description` = notes, optional `assets.links`.
-6. **Follow-up trigger** (F9): `POST /projects/:id/trigger/pipeline` per entry in `after_release.triggers`, header `JOB-TOKEN`. Errors are logged, exit stays `0`.
+5. **Forge release** (F7, part 2): the platform's release object for the tag,
+   with the notes as its description. Skipped when one already exists for the
+   tag. GitLab attaches `gitlab_release.assets` as release links; GitHub and
+   Forgejo have no link endpoint, so the links are appended to the body as an
+   `### Assets` list and the log says so (§7.1).
+6. **Follow-up trigger** (F9): `POST /projects/:id/trigger/pipeline` per entry in `after_release.triggers`, header `JOB-TOKEN`. Errors are logged, exit stays `0`. GitLab only — on the other forges every trigger is reported as undeliverable in `release-report.json` rather than guessed at.
 
 Rationale for the order: steps 3–5 are individually idempotent; a re-run after a failure at step 4 finds the tag, skips 3, repeats 4–6.
 
@@ -422,6 +425,36 @@ SSH is the format with a future here: GitLab verifies SSH signatures, and the es
 Nothing needs weakening if merging is already Maintainer-only: a Maintainer-only protected tag is then consistent. The failure case is a repository where Developers may merge but not tag — every release they trigger dies at the tag push. `yasrt check` compares the two levels and reports the mismatch as fatal, per repository, before the first release depends on it. It fails closed: GitLab answers 404 for an unauthorised read exactly as it does for an unprotected branch, so being unable to look is reported as such and never as "unprotected".
 
 **Note:** the push setting changes the behaviour of npm `semantic-release` in repos that still use it (it then authenticates with the job token and release pipelines stop running). Migrate **per repo**: enable the setting only once the repo has moved to YASRT.
+
+### 7.1 Forges
+
+yasrt publishes to the platforms semantic-release publishes to. The forge is
+**detected from the job environment**; `--forge` / `YASRT_FORGE` overrides
+detection for a job that runs somewhere the markers do not say (`gitea` is
+accepted as a synonym for `forgejo`).
+
+| | GitLab | GitHub | Forgejo |
+|---|---|---|---|
+| Detected by | `GITLAB_CI=true` or `CI_API_V4_URL` | `GITHUB_ACTIONS=true` with `GITHUB_SERVER_URL` = github.com | `FORGEJO_ACTIONS=true`, `GITEA_ACTIONS=true`, or a `GITHUB_SERVER_URL` that is not github.com |
+| API root | `CI_API_V4_URL` | `GITHUB_API_URL`, else `https://api.github.com` | `GITHUB_API_URL`, else `<server>/api/v1` |
+| Token | `CI_JOB_TOKEN` | `GITHUB_TOKEN` | `FORGEJO_TOKEN`, else `GITHUB_TOKEN` |
+| Auth header | `JOB-TOKEN` | `Authorization: Bearer` | `Authorization: token` |
+| Push user | `gitlab-ci-token:<token>` | `x-access-token:<token>` | `<token>:x-oauth-basic` |
+| Release | `POST /projects/:id/releases` | `POST /repos/o/r/releases` | same as GitHub |
+| Release links | `assets/links` endpoint | in the body (`### Assets`) | in the body |
+| Pipeline trigger | yes | no — reported, not fatal | no — reported, not fatal |
+| Link shapes | `/commit/`, `/compare/`, `/issues/`, `/merge_requests/` | `/commit/`, `/compare/`, `/issues/`, `/pull/` | as GitHub |
+
+Detection checks Forgejo **before** GitHub: Forgejo's Actions runner sets the
+`GITHUB_*` variables for compatibility, so a plain `GITHUB_ACTIONS` test would
+call every Forgejo job GitHub and post its token to the wrong API.
+
+The authority invariant above is GitLab-specific in mechanism only. On GitHub
+the equivalent is a ruleset that lets the workflow's `GITHUB_TOKEN` (with
+`contents: write`) create tags matching `tag_format`; on Forgejo, a branch
+protection that allows the token's owner to push tags. `yasrt check` probes
+GitLab; on the other forges it reports the probe as not implemented rather than
+claiming a pass.
 
 ## 8. Pipeline integration
 

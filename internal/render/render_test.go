@@ -13,6 +13,7 @@ import (
 
 	"git.ole-hartwig.eu/yasrt/cli/internal/config"
 	"git.ole-hartwig.eu/yasrt/cli/internal/conventional"
+	"git.ole-hartwig.eu/yasrt/cli/internal/forge"
 	"git.ole-hartwig.eu/yasrt/cli/internal/render"
 	"git.ole-hartwig.eu/yasrt/cli/internal/rules"
 	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
@@ -48,13 +49,13 @@ func commit(sha, msg string) conventional.Commit {
 
 func input(commits ...conventional.Commit) render.Input {
 	return render.Input{
-		Version:    semver.Version{Major: 3, Minor: 4, Patch: 0},
-		Previous:   "3.3.2",
-		Tag:        "3.4.0",
-		Date:       time.Date(2026, 9, 11, 0, 0, 0, 0, time.UTC),
-		Decision:   rules.Decision{Counted: commits},
-		Sections:   config.DefaultSections(),
-		ProjectURL: "https://git.ole-hartwig.eu/yasrt/cli",
+		Version:  semver.Version{Major: 3, Minor: 4, Patch: 0},
+		Previous: "3.3.2",
+		Tag:      "3.4.0",
+		Date:     time.Date(2026, 9, 11, 0, 0, 0, 0, time.UTC),
+		Decision: rules.Decision{Counted: commits},
+		Sections: config.DefaultSections(),
+		URLs:     forge.URLs{Kind: forge.GitLab, Base: "https://git.ole-hartwig.eu/yasrt/cli"},
 	}
 }
 
@@ -100,7 +101,7 @@ func TestNotesReferencesBecomeLinks(t *testing.T) {
 
 func TestNotesWithoutProjectURLRendersPlainReferences(t *testing.T) {
 	in := input(commit("aaa1111", "fix: x\n\nCloses: #42"))
-	in.ProjectURL = ""
+	in.URLs = forge.URLs{}
 	out := render.Notes(in)
 	if strings.Contains(out, "](") {
 		t.Errorf("without a project URL there is nothing to link to:\n%s", out)

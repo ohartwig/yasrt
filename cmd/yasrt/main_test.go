@@ -21,21 +21,26 @@ type fixture struct {
 	envPath string
 }
 
-// ambientGitLabVars are set for real when the suite runs inside a GitLab job.
-// A test that left them in place would build a live API client and publish to
+// ambientCIVars are set for real when the suite runs inside a CI job. A test
+// that left them in place would build a live API client and publish to
 // whichever project it happened to be running in — which is exactly what the
-// first CI run tried to do.
-var ambientGitLabVars = []string{
-	"CI_API_V4_URL", "CI_PROJECT_ID", "CI_PROJECT_URL", "CI_JOB_TOKEN",
-	"CI_DEFAULT_BRANCH", "CI_SERVER_HOST", "GPG_SEM_REL_B64", "YASRT_DEFAULTS", "YASRT_CONFIG",
+// first CI run tried to do. The GitHub and Forgejo markers are cleared for the
+// same reason.
+var ambientCIVars = []string{
+	"GITLAB_CI", "CI_API_V4_URL", "CI_PROJECT_ID", "CI_PROJECT_URL", "CI_JOB_TOKEN",
+	"CI_DEFAULT_BRANCH", "CI_COMMIT_BRANCH", "CI_SERVER_HOST", "GPG_SEM_REL_B64",
+	"YASRT_DEFAULTS", "YASRT_CONFIG", "YASRT_FORGE",
 	"GITLAB_USER_NAME", "GITLAB_USER_EMAIL",
+	"GITHUB_ACTIONS", "GITHUB_REPOSITORY", "GITHUB_TOKEN", "GITHUB_API_URL",
+	"GITHUB_SERVER_URL", "GITHUB_REF", "GITHUB_BASE_REF",
+	"FORGEJO_ACTIONS", "FORGEJO_TOKEN", "GITEA_ACTIONS",
 	output.KeyStatus, output.KeyVersion, output.KeyTag,
 	output.KeyPrevious, output.KeyBump, output.KeyReason, output.KeyCommit,
 }
 
 func newFixture(t *testing.T, cfg string) *fixture {
 	t.Helper()
-	for _, k := range ambientGitLabVars {
+	for _, k := range ambientCIVars {
 		t.Setenv(k, "")
 	}
 	tr := testrepo.New(t)
@@ -278,9 +283,32 @@ func TestCheck(t *testing.T) {
 		f := newFixture(t, "product: image\n")
 		f.tr.CommitFile("src/main.go", "1", "feat: first")
 		f.tr.WithRemote()
+		t.Setenv("GITLAB_CI", "true")
 		t.Setenv("CI_JOB_TOKEN", "pretend-token")
 		if got := f.check(); got != exitOK {
 			t.Errorf("exit = %d", got)
+		}
+	})
+
+	t.Run("github environment is recognised", func(t *testing.T) {
+		f := newFixture(t, "product: image\n")
+		f.tr.CommitFile("src/main.go", "1", "feat: first")
+		f.tr.WithRemote()
+		t.Setenv("GITHUB_ACTIONS", "true")
+		t.Setenv("GITHUB_REPOSITORY", "o/r")
+		t.Setenv("GITHUB_TOKEN", "pretend-token")
+		if got := f.check(); got != exitOK {
+			t.Errorf("exit = %d", got)
+		}
+	})
+
+	t.Run("no token is fatal", func(t *testing.T) {
+		f := newFixture(t, "product: image\n")
+		f.tr.CommitFile("src/main.go", "1", "feat: first")
+		f.tr.WithRemote()
+		t.Setenv("GITLAB_CI", "true")
+		if got := f.check(); got != exitError {
+			t.Errorf("exit = %d, want %d", got, exitError)
 		}
 	})
 
@@ -297,6 +325,7 @@ func TestCheck(t *testing.T) {
 		f.tr.CommitFile("a.go", "1", "feat: one")
 		f.tr.CommitFile("b.go", "2", "feat: two")
 		shallow := f.tr.Clone(1)
+		t.Setenv("GITLAB_CI", "true")
 		t.Setenv("CI_JOB_TOKEN", "pretend-token")
 		if got := run([]string{"check", "--dir", shallow.Dir, "--config", f.cfgPath}); got != exitError {
 			t.Errorf("exit = %d, want %d", got, exitError)
@@ -307,6 +336,7 @@ func TestCheck(t *testing.T) {
 		f := newFixture(t, "product: image\n")
 		f.tr.CommitFile("src/main.go", "1", "feat: first")
 		f.tr.WithRemote()
+		t.Setenv("GITLAB_CI", "true")
 		t.Setenv("CI_JOB_TOKEN", "pretend-token")
 		if got := f.check("--json"); got != exitOK {
 			t.Errorf("exit = %d", got)

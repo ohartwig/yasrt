@@ -11,8 +11,11 @@ publishes the release **after** the artefact has been built. It replaces the npm
 
 - **The tag confirms, it does not announce.** `version` decides, `build` runs,
   and only then does `release` tag. A failed build leaves no tag behind.
-- **No stored secrets.** `CI_JOB_TOKEN` is the only credential required. A GPG
-  key is optional, and `sign: auto` degrades to unsigned rather than failing.
+- **No stored secrets.** The job's own token (`CI_JOB_TOKEN`, `GITHUB_TOKEN`)
+  is the only credential required. A signing key is optional, and `sign: auto`
+  degrades to unsigned rather than failing.
+- **Three forges.** GitLab, GitHub and Forgejo — the platforms semantic-release
+  publishes to — detected from the job environment, no configuration needed.
 - **One file per repository.** `.yasrt.yaml`, with almost everything derived
   from a single `product:` field.
 - **Three dependencies.** A YAML parser, a glob matcher, and git itself.
@@ -46,6 +49,18 @@ go install git.ole-hartwig.eu/yasrt/cli/cmd/yasrt@latest
 
 Binaries for `linux/amd64` and `linux/arm64` are published to this project's
 generic package registry with a signed `SHA256SUMS` manifest.
+
+On GitHub Actions or Forgejo Actions the same binary runs with the workflow's
+token:
+
+```yaml
+- run: yasrt next && <build> && yasrt release
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # FORGEJO_TOKEN on Forgejo
+```
+
+The job needs `contents: write`. Where the platform cannot be told apart from
+its variables, `--forge gitlab|github|forgejo` (or `YASRT_FORGE`) says so.
 
 ## Configure
 
@@ -89,7 +104,7 @@ hooks:
 | `after_analysis` | in `next`, after the decision | reported |
 | `before_tag` | in `release`, before any write | **aborts**, repository untouched |
 | `after_tag` | tag on the remote, release commit not yet made | **aborts** |
-| `after_release` | last, after the GitLab release and triggers | reported |
+| `after_release` | last, after the forge release and triggers | reported |
 
 `args` are passed verbatim — no shell, so nothing is word-split or
 glob-expanded. `allow_failure` overrides the default either way. Hooks are never
@@ -146,16 +161,31 @@ go test ./internal/analyze -run TestForce -v     # one test
 gofmt -l . && go vet ./...
 ```
 
-Integration tests build throwaway git repositories and serve the GitLab API from
-`httptest`. Nothing in the suite touches a real GitLab instance.
+Integration tests build throwaway git repositories and serve the GitLab, GitHub
+and Forgejo release APIs from `httptest`. Nothing in the suite touches a real
+instance of any of them.
 
 ## Decommission
 
 Remove the component include and `.yasrt.yaml`, and put the previous
 `semantic-release` include back. yasrt holds no state of its own: everything it
-produces is a tag, a commit, a GitLab release and a job artefact. Disable the
-project setting **Allow Git push requests to the repository** afterwards if
-nothing else needs it.
+produces is a tag, a commit, a release on the forge and a job artefact. On
+GitLab, disable the project setting **Allow Git push requests to the
+repository** afterwards if nothing else needs it.
+
+## Forges
+
+| | GitLab | GitHub | Forgejo |
+|---|---|---|---|
+| detected by | `GITLAB_CI` | `GITHUB_ACTIONS` on github.com | `FORGEJO_ACTIONS`, or `GITHUB_SERVER_URL` elsewhere |
+| token | `CI_JOB_TOKEN` | `GITHUB_TOKEN` | `FORGEJO_TOKEN` or `GITHUB_TOKEN` |
+| release links | attached to the release | listed in the release body | listed in the release body |
+| `after_release.triggers` | pipeline trigger API | not available — reported per trigger, exit stays `0` | as GitHub |
+| `yasrt check` authority probe | compares branch and tag protection | not probed | not probed |
+
+Forgejo is identified before GitHub because its runner sets the `GITHUB_*`
+variables for compatibility; a naive check would post a Forgejo token to
+api.github.com. `gitea` is accepted as a synonym for `forgejo`.
 
 ## Signing
 

@@ -15,6 +15,7 @@ import (
 
 	"git.ole-hartwig.eu/yasrt/cli/internal/config"
 	"git.ole-hartwig.eu/yasrt/cli/internal/conventional"
+	"git.ole-hartwig.eu/yasrt/cli/internal/forge"
 	"git.ole-hartwig.eu/yasrt/cli/internal/rules"
 	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
 )
@@ -33,9 +34,10 @@ type Input struct {
 	Date     time.Time
 	Decision rules.Decision
 	Sections []config.Section
-	// ProjectURL is the web URL of the project, used to turn #123 and !45 into
-	// links. Without it, references are rendered as plain text.
-	ProjectURL string
+	// URLs builds the web addresses that appear in the notes. Its shapes differ
+	// per forge — a merge request is a pull request elsewhere — so they come
+	// from the forge rather than being assembled here.
+	URLs forge.URLs
 }
 
 // refRE finds issue (#12) and merge request (!34) references.
@@ -66,7 +68,7 @@ func Notes(in Input) string {
 		}
 		fmt.Fprintf(&b, "### %s\n\n", sec.Title)
 		for _, c := range commits {
-			b.WriteString(entry(c, in.ProjectURL))
+			b.WriteString(entry(c, in.URLs))
 		}
 		b.WriteString("\n")
 	}
@@ -81,7 +83,7 @@ func Notes(in Input) string {
 //
 // Matching it matters more than preferring another shape: a migrated
 // repository's changelog would otherwise change format halfway down the file.
-func entry(c conventional.Commit, projectURL string) string {
+func entry(c conventional.Commit, urls forge.URLs) string {
 	var b strings.Builder
 	b.WriteString("* ")
 	if c.Scope != "" {
@@ -89,14 +91,13 @@ func entry(c conventional.Commit, projectURL string) string {
 	}
 	b.WriteString(c.Description)
 	if c.ShortSHA != "" {
-		if projectURL != "" {
-			fmt.Fprintf(&b, " ([%s](%s/commit/%s))",
-				c.ShortSHA, strings.TrimRight(projectURL, "/"), c.SHA)
+		if link := urls.Commit(c.SHA); link != "" {
+			fmt.Fprintf(&b, " ([%s](%s))", c.ShortSHA, link)
 		} else {
 			fmt.Fprintf(&b, " (%s)", c.ShortSHA)
 		}
 	}
-	if refs := references(c, projectURL); refs != "" {
+	if refs := references(c, urls); refs != "" {
 		fmt.Fprintf(&b, " (%s)", refs)
 	}
 	b.WriteString("\n")
@@ -106,7 +107,7 @@ func entry(c conventional.Commit, projectURL string) string {
 // references collects issue and merge-request references from the footers.
 // Only footers are scanned: prose in the body mentioning a number is not a
 // reference, and turning it into a link would be a lie.
-func references(c conventional.Commit, projectURL string) string {
+func references(c conventional.Commit, urls forge.URLs) string {
 	seen := map[string]bool{}
 	var out []string
 	for _, f := range c.Footers {
@@ -119,7 +120,7 @@ func references(c conventional.Commit, projectURL string) string {
 				continue
 			}
 			seen[token] = true
-			out = append(out, link(m[1], m[2], projectURL))
+			out = append(out, link(m[1], m[2], urls))
 		}
 	}
 	return strings.Join(out, ", ")
@@ -130,22 +131,20 @@ func isBreaking(tok string) bool {
 	return up == "BREAKING CHANGE" || up == "BREAKING-CHANGE"
 }
 
-func link(kind, number, projectURL string) string {
+func link(kind, number string, urls forge.URLs) string {
 	text := kind + number
-	if projectURL == "" {
+	var href string
+	switch kind {
+	case "#":
+		href = urls.Issue(number)
+	case "!":
+		// A merge request on GitLab, a pull request elsewhere.
+		href = urls.Change(number)
+	}
+	if href == "" {
 		return text
 	}
-	base := strings.TrimRight(projectURL, "/")
-	switch kind {
-	// Without the /-/ infix, matching the links the estate's existing
-	// changelogs carry. GitLab serves both forms; consistency inside a file
-	// that is about to gain entries from a different tool matters more.
-	case "#":
-		return fmt.Sprintf("[%s](%s/issues/%s)", text, base, number)
-	case "!":
-		return fmt.Sprintf("[%s](%s/merge_requests/%s)", text, base, number)
-	}
-	return text
+	return fmt.Sprintf("[%s](%s)", text, href)
 }
 
 // ChangelogHeading introduces one release, in the shape the estate's existing
@@ -157,22 +156,25 @@ func link(kind, number, projectURL string) string {
 // Without a project URL or a predecessor there is nothing to compare against,
 // and the heading degrades to the plain form rather than linking nowhere.
 func ChangelogHeading(v semver.Version, date time.Time) string {
-	return headingFor(v, date, "", "", "")
+	return headingFor(v, date, forge.URLs{}, "", "")
 }
 
-func headingFor(v semver.Version, date time.Time, projectURL, previousTag, tag string) string {
+func headingFor(v semver.Version, date time.Time, urls forge.URLs, previousTag, tag string) string {
 	day := date.Format(time.DateOnly)
-	if projectURL == "" || previousTag == "" || tag == "" {
+	if previousTag == "" || tag == "" {
 		return fmt.Sprintf("## [%s] (%s)", v, day)
 	}
-	return fmt.Sprintf("## [%s](%s/compare/%s...%s) (%s)",
-		v, strings.TrimRight(projectURL, "/"), previousTag, tag, day)
+	cmp := urls.Compare(previousTag, tag)
+	if cmp == "" {
+		return fmt.Sprintf("## [%s] (%s)", v, day)
+	}
+	return fmt.Sprintf("## [%s](%s) (%s)", v, cmp, day)
 }
 
 // PrependChangelog inserts a release block at the top of an existing changelog,
 // below any document title, and creates the document when it is missing.
 func PrependChangelog(existing string, in Input, notes string) string {
-	block := headingFor(in.Version, in.Date, in.ProjectURL, in.Previous, in.Tag) +
+	block := headingFor(in.Version, in.Date, in.URLs, in.Previous, in.Tag) +
 		"\n\n" + strings.TrimRight(notes, "\n") + "\n"
 
 	// No document title: the estate's changelogs start straight at the first

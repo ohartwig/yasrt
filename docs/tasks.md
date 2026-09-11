@@ -322,6 +322,24 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
 
 ---
 
+## P11 — Forges
+
+- [x] **T-150** `internal/forge`: `Client` interface (release get/create, links, kind), `URLs`
+      for commit/compare/issue/change links, `PushCredentials` per platform. GitLab client moved
+      behind it; GitHub and Forgejo share one client (Gitea's API is GitHub-shaped) that differs
+      in auth header and API root.
+- [x] **T-151** Detection from the job environment, Forgejo before GitHub because Forgejo's
+      runner sets `GITHUB_*` for compatibility. `--forge` / `YASRT_FORGE` override.
+- [x] **T-152** Release path proven on all three against `httptest` servers: links land in the
+      body where there is no link endpoint, triggers are reported as undeliverable off GitLab,
+      reruns skip an existing release, changelog links follow the forge.
+- [x] **T-153** `yasrt check` reports the detected forge and pushes with the right credential
+      shape; the authority probe stays GitLab-only and says "not probed" elsewhere.
+- [x] **T-154** SPEC §2/§6.2/§7.1, README, schema and CLAUDE.md updated. `internal/gitlab`
+      trimmed to the protection-rule reads.
+- [ ] **T-155** Run one real release on GitHub and one on Forgejo (Codeberg) from a throwaway
+      repository. *Done when:* both show a release with the expected notes and an Assets list.
+
 ## Open items carried from the plan
 
 - [x] **T-900** Go coverage threshold: **75 %, blocking**, matching the estate's stated PHP gate.

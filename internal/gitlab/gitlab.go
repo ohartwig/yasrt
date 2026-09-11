@@ -22,7 +22,9 @@ import (
 	"time"
 )
 
-// Client is a GitLab API client authenticated with a CI job token.
+// Client is a GitLab API client authenticated with a CI job token. It reads
+// the protection rules `yasrt check` compares; publishing goes through
+// internal/forge.
 type Client struct {
 	APIURL    string // e.g. https://git.example.com/api/v4
 	ProjectID string // numeric id or URL-encoded path
@@ -64,97 +66,6 @@ func (e *APIError) Error() string {
 
 // Retryable reports whether another attempt could plausibly succeed.
 func (e *APIError) Retryable() bool { return e.Status >= 500 || e.Status == http.StatusTooManyRequests }
-
-// Release is the subset of a GitLab release yasrt reads back.
-type Release struct {
-	TagName     string `json:"tag_name"`
-	Name        string `json:"name,omitzero"`
-	Description string `json:"description,omitzero"`
-	Links       struct {
-		Self string `json:"self,omitzero"`
-	} `json:"_links,omitzero"`
-}
-
-// URL is the web address of the release, when GitLab supplied one.
-func (r *Release) URL() string {
-	if r == nil {
-		return ""
-	}
-	return r.Links.Self
-}
-
-// CreateReleaseRequest is the body of POST /releases.
-type CreateReleaseRequest struct {
-	TagName     string `json:"tag_name"`
-	Name        string `json:"name,omitzero"`
-	Description string `json:"description,omitzero"`
-	// Ref is only sent when the tag does not exist yet. yasrt always creates
-	// the tag itself first, so this stays empty.
-	Ref string `json:"ref,omitzero"`
-}
-
-// CreateRelease publishes a release for an existing tag.
-func (c *Client) CreateRelease(ctx context.Context, req CreateReleaseRequest) (*Release, error) {
-	var out Release
-	err := c.do(ctx, http.MethodPost, c.projectPath("releases"), req, &out)
-	if err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
-// GetRelease reads a release. ok is false when GitLab reports 404, which is the
-// normal "not created yet" case rather than an error.
-func (c *Client) GetRelease(ctx context.Context, tag string) (rel *Release, ok bool, err error) {
-	var out Release
-	err = c.do(ctx, http.MethodGet, c.projectPath("releases/"+url.PathEscape(tag)), nil, &out)
-	var apiErr *APIError
-	if errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound {
-		return nil, false, nil
-	}
-	if err != nil {
-		return nil, false, err
-	}
-	return &out, true, nil
-}
-
-// Link is a release asset link.
-type Link struct {
-	Name     string `json:"name"`
-	URL      string `json:"url"`
-	LinkType string `json:"link_type,omitzero"`
-}
-
-// AddReleaseLink attaches one asset link to a release.
-func (c *Client) AddReleaseLink(ctx context.Context, tag string, l Link) error {
-	path := c.projectPath("releases/" + url.PathEscape(tag) + "/assets/links")
-	return c.do(ctx, http.MethodPost, path, l, nil)
-}
-
-// Pipeline is the response of a pipeline trigger.
-type Pipeline struct {
-	ID     int    `json:"id"`
-	WebURL string `json:"web_url,omitzero"`
-	Status string `json:"status,omitzero"`
-}
-
-// triggerRequest is the body of POST /trigger/pipeline. Variables are sent as
-// a map, which the API accepts alongside the JOB-TOKEN header.
-type triggerRequest struct {
-	Ref       string            `json:"ref"`
-	Variables map[string]string `json:"variables,omitzero"`
-}
-
-// TriggerPipeline starts a pipeline in another project. The target project must
-// list this project on its job-token allowlist.
-func (c *Client) TriggerPipeline(ctx context.Context, project, ref string, vars map[string]string) (*Pipeline, error) {
-	path := "/projects/" + url.PathEscape(project) + "/trigger/pipeline"
-	var out Pipeline
-	if err := c.do(ctx, http.MethodPost, path, triggerRequest{Ref: ref, Variables: vars}, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
 
 func (c *Client) projectPath(suffix string) string {
 	return "/projects/" + url.PathEscape(c.ProjectID) + "/" + suffix

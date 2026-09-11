@@ -13,6 +13,7 @@ import (
 
 	"git.ole-hartwig.eu/yasrt/cli/internal/config"
 	"git.ole-hartwig.eu/yasrt/cli/internal/deliver"
+	"git.ole-hartwig.eu/yasrt/cli/internal/forge"
 	"git.ole-hartwig.eu/yasrt/cli/internal/git"
 	"git.ole-hartwig.eu/yasrt/cli/internal/gitlab"
 	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
@@ -36,11 +37,14 @@ func cmdCheck(args []string) error {
 		dir       string
 		probePush bool
 		remote    string
+		forgeKind string
 	)
 	fs := flag.NewFlagSet("yasrt check", flag.ContinueOnError)
 	common.register(fs)
 	fs.StringVar(&dir, "dir", ".", "repository directory")
 	fs.StringVar(&remote, "remote", "origin", "git remote to probe")
+	fs.StringVar(&forgeKind, "forge", os.Getenv("YASRT_FORGE"),
+		"gitlab, github or forgejo; detected from the CI environment when empty")
 	fs.BoolVar(&probePush, "push", false,
 		"also prove that pushing works by creating and deleting "+checkRef+" on the remote")
 	fs.Usage = func() {
@@ -51,7 +55,15 @@ func cmdCheck(args []string) error {
 		return err
 	}
 
-	log := common.logger(os.Getenv("CI_JOB_TOKEN"))
+	env, detected := forge.Detect(forge.OSGetenv)
+	if forgeKind != "" {
+		k, err := forge.ParseKind(forgeKind)
+		if err != nil {
+			return err
+		}
+		env.Kind = k
+	}
+	log := common.logger(env.Token)
 	var out []checkResult
 	add := func(name string, ok, fatal bool, detail string) {
 		out = append(out, checkResult{Name: name, OK: ok, Detail: detail, Fatal: fatal && !ok})
@@ -108,11 +120,16 @@ func cmdCheck(args []string) error {
 	}
 
 	// Credentials and remote.
-	token := os.Getenv("CI_JOB_TOKEN")
-	add("CI_JOB_TOKEN", token != "", true, presence(token != ""))
-	apiURL, projectID := os.Getenv("CI_API_V4_URL"), os.Getenv("CI_PROJECT_ID")
-	add("gitlab api", apiURL != "" && projectID != "", false,
-		fmt.Sprintf("CI_API_V4_URL=%s CI_PROJECT_ID=%s", presence(apiURL != ""), presence(projectID != "")))
+	token := env.Token
+	switch {
+	case detected || forgeKind != "":
+		add("forge", true, false, fmt.Sprintf("%s (repo %s)", env.Kind, presence(env.Repo != "")))
+	default:
+		add("forge", false, false, "no CI environment recognised; pass --forge outside a pipeline")
+	}
+	add("token", token != "", true, presence(token != ""))
+	add("forge api", env.APIURL != "" && env.Repo != "", false,
+		fmt.Sprintf("api=%s repo=%s", presence(env.APIURL != ""), presence(env.Repo != "")))
 
 	if url, err := repo.RemoteURL(remote); err != nil {
 		add("remote", false, true, err.Error())
@@ -121,12 +138,18 @@ func cmdCheck(args []string) error {
 	}
 
 	// The release-authority invariant. This is the check that answers, per
-	// repository, the question the design otherwise leaves open.
-	if apiURL != "" && projectID != "" && token != "" && cfg != nil {
+	// repository, the question the design otherwise leaves open. Only GitLab
+	// exposes the two rule sets it compares; elsewhere the answer is "not
+	// probed", never "fine".
+	switch {
+	case env.Kind != forge.GitLab && env.Kind != "":
+		add("release authority", true, false, fmt.Sprintf(
+			"not probed on %s; make sure the token may create tags matching %s", env.Kind, cfgTagFormat(cfg)))
+	case env.APIURL != "" && env.Repo != "" && token != "" && cfg != nil:
 		out = append(out, probeReleaseAuthority(
-			gitlab.New(apiURL, projectID, token), cfg,
-			firstNonEmptyStr(os.Getenv("CI_DEFAULT_BRANCH"), "main")))
-	} else {
+			gitlab.New(env.APIURL, env.Repo, token), cfg,
+			firstNonEmptyStr(env.DefaultBranch, "main")))
+	default:
 		add("release authority", true, false,
 			"not probed; needs CI_API_V4_URL, CI_PROJECT_ID and CI_JOB_TOKEN")
 	}
@@ -134,7 +157,7 @@ func cmdCheck(args []string) error {
 	// Push permission. This is the one probe that writes, so it is opt-in: the
 	// rest of `check` is safe to run anywhere.
 	if probePush {
-		out = append(out, probePushPermission(repo, remote, token))
+		out = append(out, probePushPermission(repo, remote, env.Kind, token))
 	} else {
 		add("push permission", true, false,
 			"not probed; re-run with --push to prove the token may push tags and branches")
@@ -146,7 +169,7 @@ func cmdCheck(args []string) error {
 // probePushPermission pushes a throwaway ref and deletes it again. It answers
 // the question that otherwise only surfaces during a real release: may this
 // identity write to the repository at all?
-func probePushPermission(repo *git.Repo, remote, token string) checkResult {
+func probePushPermission(repo *git.Repo, remote string, kind forge.Kind, token string) checkResult {
 	url, err := repo.RemoteURL(remote)
 	if err != nil {
 		return checkResult{Name: "push permission", Detail: err.Error(), Fatal: true}
@@ -156,7 +179,7 @@ func probePushPermission(repo *git.Repo, remote, token string) checkResult {
 		if i := strings.IndexByte(rest, '@'); i >= 0 {
 			rest = rest[i+1:]
 		}
-		url = "https://gitlab-ci-token:" + token + "@" + rest
+		url = "https://" + forge.PushCredentials(kind, token) + "@" + rest
 		repo.AddSecret(url)
 	}
 
@@ -269,6 +292,13 @@ func firstNonEmptyStr(vals ...string) string {
 		}
 	}
 	return ""
+}
+
+func cfgTagFormat(cfg *config.Config) string {
+	if cfg == nil {
+		return "tag_format"
+	}
+	return cfg.TagFormatString()
 }
 
 func presence(ok bool) string {

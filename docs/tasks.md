@@ -270,11 +270,13 @@ or estate-wide decisions, and is marked `[ ]`, `[~]` or `[!]`.
 - [x] **T-143** Document hooks in SPEC §5.2, the JSON schema, the README and CONTRIBUTING, and
       amend the SPEC §2 non-goal.
       *Done when:* the four documents agree on what a hook is and when it runs.
-- [ ] **T-144** Port the estate's existing release satellites to hooks or leave them as CI jobs:
-      `composer-package-gitlab-release`, `typo3-extension-release`, `packagist-submit`,
-      `cleanup-release-tags`.
-      *Done when:* each is either a documented hook or a documented downstream job, and the
-      choice is recorded.
+- [x] **T-144** Established which satellites break and how they migrate. `release:package`,
+      `release:ter` and `packagist-submit` all fire on `$CI_COMMIT_TAG` and therefore stop
+      running once tags are pushed with a job token; `cleanup-release-tags` is unaffected.
+      The migration is uniform — run after `release` and read `$RELEASE_TAG`, or become an
+      `after_release` hook — and is documented with a before/after in the release-tools README.
+- [ ] **T-145** Rewrite the three affected templates so they no longer depend on a tag pipeline.
+      *Done when:* each publishes from the release pipeline and a consuming repository proves it.
 
 ## P10 — Prereleases, then decommissioning
 

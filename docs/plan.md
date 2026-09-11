@@ -270,16 +270,26 @@ weakness already documented for the Renovate and melange keys. Carried as an exp
 the SSH-signing-via-OIDC path as the exit; `sign: auto` degrades to unsigned so the key is never
 load-bearing for a release.
 
-**R8 — Tag-triggered builds stop firing.** *(open, affects every image repo)*
-Image repositories today build on `rules: if: $CI_COMMIT_TAG`, and the tag
-pipeline runs because `semantic-release` pushes with a token that starts
-pipelines. `CI_JOB_TOKEN` deliberately does not — that is loop guard 1. So after
-migration a tag-triggered build would simply never run, and the image for a
-release would silently never be built. Migrating an image repository therefore
-means rewriting its build job from tag-triggered to `RELEASE_VERSION`-driven in
-the same pipeline, which is what SPEC §6.4 already prescribes and what yasrt's
-own `.gitlab-ci.yml` demonstrates. This is real per-repo migration work that the
-first draft of this plan did not account for, and it lands in P8 and P9.
+**R8 — Every tag-triggered job stops firing.** *(open, affects far more than image repos)*
+Jobs that fire on `rules: if: $CI_COMMIT_TAG` work today because
+`semantic-release` pushes the tag with a credential that starts pipelines.
+`CI_JOB_TOKEN` deliberately does not — that is loop guard 1, and it is what lets
+yasrt drop the `changes:` guard. After migration such a job never runs again.
+Nothing errors; the job simply does not exist, which is the worst shape a
+regression can take.
+
+Checked, not assumed: in `release-tools` alone this hits **`release:package`**
+(Composer publish), **`release:ter`** (TYPO3 Extension Repository) and
+**`packagist-submit`** — three of the four satellites — plus every image
+repository's build job and any customer job of the same shape.
+`cleanup-release-tags` is unaffected.
+
+The fix is uniform: the job moves into the release pipeline, runs after
+`release`, and reads `$RELEASE_TAG` instead of `$CI_COMMIT_TAG` — or becomes an
+`after_release` hook, which needs no job at all. Documented with a before/after
+in the release-tools README (MR !203). This is real per-repo migration work that
+the first draft of this plan did not account for, and it is the single largest
+item in P8 and P9.
 
 **R7 — First `golangci-lint` and `govulncheck` in the estate** (§2.11). No config to inherit, and
 adding them to `composed-default-pipelines/go` would affect the two other Go consumers. Start local to

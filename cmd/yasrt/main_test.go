@@ -27,7 +27,7 @@ type fixture struct {
 // first CI run tried to do.
 var ambientGitLabVars = []string{
 	"CI_API_V4_URL", "CI_PROJECT_ID", "CI_PROJECT_URL", "CI_JOB_TOKEN",
-	"CI_DEFAULT_BRANCH", "CI_SERVER_HOST", "GPG_SEM_REL_B64",
+	"CI_DEFAULT_BRANCH", "CI_SERVER_HOST", "GPG_SEM_REL_B64", "YASRT_DEFAULTS", "YASRT_CONFIG",
 	"GITLAB_USER_NAME", "GITLAB_USER_EMAIL",
 	output.KeyStatus, output.KeyVersion, output.KeyTag,
 	output.KeyPrevious, output.KeyBump, output.KeyReason, output.KeyCommit,
@@ -310,6 +310,76 @@ func TestCheck(t *testing.T) {
 		t.Setenv("CI_JOB_TOKEN", "pretend-token")
 		if got := f.check("--json"); got != exitOK {
 			t.Errorf("exit = %d", got)
+		}
+	})
+}
+
+// The estate keeps release configuration central: ninety repositories carry
+// none of their own. These prove the CLI honours that both ways.
+func TestDefaultsFromFlagAndEnvironment(t *testing.T) {
+	t.Run("a repository with no config of its own releases from defaults", func(t *testing.T) {
+		f := newFixture(t, "product: image\n")
+		// Remove the fixture's own config; only the defaults remain.
+		if err := os.Remove(f.cfgPath); err != nil {
+			t.Fatal(err)
+		}
+		defaults := filepath.Join(t.TempDir(), "defaults.yaml")
+		if err := os.WriteFile(defaults, []byte("product: image\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		f.tr.CommitFile("src/main.go", "1", "feat: something shippable")
+
+		got := run([]string{"next", "--dir", f.tr.Dir, "--config", f.cfgPath,
+			"--defaults", defaults, "--output", f.envPath})
+		if got != exitOK {
+			t.Fatalf("exit = %d", got)
+		}
+		kv, err := output.ReadDotenv(f.envPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if kv[output.KeyStatus] != "release" || kv[output.KeyVersion] != "1.0.0" {
+			t.Errorf("handshake = %+v", kv)
+		}
+	})
+
+	t.Run("YASRT_DEFAULTS is honoured, which is how the component passes them", func(t *testing.T) {
+		f := newFixture(t, "product: image\n")
+		if err := os.Remove(f.cfgPath); err != nil {
+			t.Fatal(err)
+		}
+		defaults := filepath.Join(t.TempDir(), "defaults.yaml")
+		if err := os.WriteFile(defaults, []byte("product: package\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("YASRT_DEFAULTS", defaults)
+		f.tr.CommitFile("src/main.go", "1", "feat: something shippable")
+
+		if got := run([]string{"next", "--dir", f.tr.Dir, "--config", f.cfgPath, "--output", f.envPath}); got != exitOK {
+			t.Fatalf("exit = %d", got)
+		}
+		kv, _ := output.ReadDotenv(f.envPath)
+		// product: package derives a v-prefixed tag format.
+		if kv[output.KeyTag] != "v1.0.0" {
+			t.Errorf("tag = %q — the defaults' product should drive the derivation", kv[output.KeyTag])
+		}
+	})
+
+	t.Run("the repository still wins over the defaults", func(t *testing.T) {
+		f := newFixture(t, "tag_format: \"${version}\"\n")
+		defaults := filepath.Join(t.TempDir(), "defaults.yaml")
+		if err := os.WriteFile(defaults, []byte("product: package\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		f.tr.CommitFile("src/main.go", "1", "feat: shippable")
+
+		if got := run([]string{"next", "--dir", f.tr.Dir, "--config", f.cfgPath,
+			"--defaults", defaults, "--output", f.envPath}); got != exitOK {
+			t.Fatalf("exit = %d", got)
+		}
+		kv, _ := output.ReadDotenv(f.envPath)
+		if kv[output.KeyTag] != "1.0.0" {
+			t.Errorf("tag = %q — the repository's tag_format must override the derivation", kv[output.KeyTag])
 		}
 	})
 }

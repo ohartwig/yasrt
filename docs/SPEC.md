@@ -16,7 +16,9 @@ GitLab CI/CD component. It
 - decides **whether** and **which** version gets published (commit analysis + deliverability),
 - publishes it **only after the artifact has been built** (tag = confirmation, not announcement),
 - runs **without stored secrets** (only `CI_JOB_TOKEN`; GPG optional),
-- is fully described by **one configuration file per repo**.
+- is described by **layered configuration**: shared defaults supplied by the CI
+  component, overridden per repository where it differs (§5.4). A repository
+  that matches its component's defaults needs no file at all.
 
 ## 2. Non-goals
 
@@ -171,6 +173,35 @@ after_release:             # F9 – non-fatal
         RELEASED_PACKAGE: "${CI_PROJECT_PATH}"
         RELEASED_VERSION: "${tag}"
 ```
+
+### 5.4 Layered configuration
+
+```sh
+yasrt next --defaults /etc/yasrt/image.yaml          # or YASRT_DEFAULTS
+```
+
+`--defaults` is repeatable and merges **under** the repository's own
+`.yasrt.yaml`; later layers win. `.yasrt.yaml` is optional once defaults supply
+what is needed — a repository that matches its component's defaults carries no
+file.
+
+Merge rules: maps merge key by key, scalars and lists replace. Lists replace on
+purpose — with `rules` the order decides the outcome, and a silently extended
+list would change which rule matches first. Where extending is wanted the schema
+says so, which is what `extra_non_release_paths` is for.
+
+Each layer is checked for unknown fields on its own, so a typo is reported
+against the file it is in rather than against the merged whole; validation then
+runs on the merged result, so defaults may be incomplete as long as the
+repository completes them.
+
+**Why this is not the preset mechanism again.** What the npm chain got wrong was
+not central defaults but their transport: a preset package resolved at run time,
+which is where the 384–516 unpinned dependencies came from. Here the defaults
+are a plain file written by the component the repository already includes and
+pins. No registry, no network, no resolution step. This matters because the
+estate keeps release configuration central on purpose — 90 repositories carry
+none of their own, and the shared template says so in as many words.
 
 ### 5.3 Prereleases
 

@@ -14,9 +14,11 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"git.ole-hartwig.eu/yasrt/cli/internal/analyze"
+	"git.ole-hartwig.eu/yasrt/cli/internal/config"
 	"git.ole-hartwig.eu/yasrt/cli/internal/logging"
 	"git.ole-hartwig.eu/yasrt/cli/internal/release"
 )
@@ -120,13 +122,45 @@ var errSilent = errors.New("already reported")
 // commonFlags are shared by every subcommand.
 type commonFlags struct {
 	config    string
+	defaults  defaultsFlag
 	logFormat string
 	verbose   bool
 	json      bool
 }
 
+// defaultsFlag collects repeatable --defaults paths in the order given, since
+// later layers override earlier ones.
+type defaultsFlag []string
+
+func (d *defaultsFlag) String() string { return strings.Join(*d, string(os.PathListSeparator)) }
+
+func (d *defaultsFlag) Set(v string) error {
+	for _, p := range filepath.SplitList(v) {
+		if p = strings.TrimSpace(p); p != "" {
+			*d = append(*d, p)
+		}
+	}
+	return nil
+}
+
+// layers returns the default files to merge under the repository's own
+// configuration: the flag if given, otherwise YASRT_DEFAULTS, which is how the
+// CI component passes the shared configuration it carries.
+func (c *commonFlags) layers() []string {
+	if len(c.defaults) > 0 {
+		return c.defaults
+	}
+	var env defaultsFlag
+	_ = env.Set(os.Getenv(config.DefaultsEnv))
+	return env
+}
+
 func (c *commonFlags) register(fs *flag.FlagSet) {
-	fs.StringVar(&c.config, "config", envOr("YASRT_CONFIG", ".yasrt.yaml"), "path to the configuration file")
+	fs.StringVar(&c.config, "config", envOr("YASRT_CONFIG", ".yasrt.yaml"),
+		"path to the repository's configuration file; optional when --defaults supplies one")
+	fs.Var(&c.defaults, "defaults",
+		"configuration merged UNDER the repository's own; repeatable, later wins. "+
+			"Defaults to "+config.DefaultsEnv+", which the CI component sets")
 	fs.StringVar(&c.logFormat, "log-format", envOr("YASRT_LOG_FORMAT", "text"), "log format: text or json")
 	fs.BoolVar(&c.verbose, "verbose", false, "log every decision, including ignored commits")
 	fs.BoolVar(&c.json, "json", false, "emit a machine-readable summary on stdout")

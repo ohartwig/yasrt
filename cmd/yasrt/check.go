@@ -58,7 +58,7 @@ func cmdCheck(args []string) error {
 	}
 
 	// Configuration.
-	cfg, cfgErr := config.Load(common.config)
+	cfg, cfgErr := config.LoadLayered(common.layers(), common.config)
 	if cfgErr != nil {
 		add("config", false, true, cfgErr.Error())
 	} else {

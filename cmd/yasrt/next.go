@@ -63,7 +63,7 @@ func cmdNext(args []string) error {
 
 	log := common.logger()
 
-	cfg, err := config.Load(common.config)
+	cfg, err := config.LoadLayered(common.layers(), common.config)
 	if err != nil {
 		return err
 	}

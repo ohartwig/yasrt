@@ -50,7 +50,7 @@ func cmdRelease(args []string) error {
 	token := os.Getenv("CI_JOB_TOKEN")
 	log := common.logger(token, os.Getenv(gpgVar))
 
-	cfg, err := config.Load(common.config)
+	cfg, err := config.LoadLayered(common.layers(), common.config)
 	if err != nil {
 		return err
 	}

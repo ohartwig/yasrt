@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.1] - 2026-09-11
+
+### :bug: Fixes
+
+- test: force the git identity instead of configuring it (daac8c6)
+
+### :white_check_mark: Tests
+
+- an empty defaults layer must merge to nothing (5b54198)
+
 ## [1.2.0] - 2026-09-11
 
 ### :sparkles: Features

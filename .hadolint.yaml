@@ -1,0 +1,10 @@
+---
+# Same shape as devops/container's configuration: only errors fail the build.
+failure-threshold: error
+override:
+  info:
+    # DL3018 wants every apk package pinned to an exact version. The estate
+    # pins the packages that define the image (here: git, via ARG and Renovate)
+    # and lets the Wolfi base decide the rest, because Wolfi rolls forward and
+    # an exact pin on ca-certificates would mean shipping a stale trust store.
+    - DL3018

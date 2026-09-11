@@ -55,18 +55,21 @@ func TestLogParsesMultilineMessages(t *testing.T) {
 		t.Fatalf("got %d commits, want 2: %#v\nraw log:\n%s",
 			len(commits), commits, mustRun(t, r, "log", "--format=%H %h %an <%ae>%n%B%n--"))
 	}
-	// Newest first.
+	// Newest first. Every failure below dumps the raw log as well: this test
+	// has failed four times in full-suite runs and never once when looked for,
+	// so the next occurrence has to explain itself rather than need a repro.
+	raw := mustRun(t, r, "log", "--format=%H %h %an <%ae>%n%B%n--")
 	if !strings.HasPrefix(commits[0].Message, "fix(scope): second") {
-		t.Errorf("message = %q", commits[0].Message)
+		t.Errorf("message = %q\nparsed: %#v\nraw log:\n%s", commits[0].Message, commits, raw)
 	}
 	if !strings.Contains(commits[0].Message, "BREAKING CHANGE: gone") {
-		t.Errorf("multi-line message truncated: %q", commits[0].Message)
+		t.Errorf("multi-line message truncated: %q\nraw log:\n%s", commits[0].Message, raw)
 	}
 	if commits[0].AuthorEmail != "test@example.invalid" {
-		t.Errorf("author = %q", commits[0].AuthorEmail)
+		t.Errorf("author = %q\nraw log:\n%s", commits[0].AuthorEmail, raw)
 	}
 	if commits[0].ShortSHA == "" || !strings.HasPrefix(commits[0].SHA, commits[0].ShortSHA) {
-		t.Errorf("sha=%q short=%q", commits[0].SHA, commits[0].ShortSHA)
+		t.Errorf("sha=%q short=%q\nraw log:\n%s", commits[0].SHA, commits[0].ShortSHA, raw)
 	}
 }
 

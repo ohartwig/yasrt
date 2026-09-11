@@ -337,8 +337,10 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
       shape; the authority probe stays GitLab-only and says "not probed" elsewhere.
 - [x] **T-154** SPEC §2/§6.2/§7.1, README, schema and CLAUDE.md updated. `internal/gitlab`
       trimmed to the protection-rule reads.
-- [ ] **T-155** Run one real release on GitHub and one on Forgejo (Codeberg) from a throwaway
-      repository. *Done when:* both show a release with the expected notes and an Assets list.
+- [~] **T-155** Real release on GitHub done on 2026-09-11 from a throwaway repository
+      (`ohartwig/yasrt-forge-probe`, deleted afterwards): two consecutive releases, tags on the
+      built commits, changelog with compare link, Assets list in the body, trigger reported as
+      undeliverable, no workflow re-triggered by the `GITHUB_TOKEN` push. Forgejo still to run.
 
 ## Open items carried from the plan
 

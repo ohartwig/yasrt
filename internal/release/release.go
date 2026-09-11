@@ -194,6 +194,13 @@ func Run(ctx context.Context, o Options) (*Report, error) {
 	}
 	rep.Signed = sign
 
+	// An annotated tag records a tagger, so the identity has to exist before
+	// step 3, not merely before the release commit. A fresh CI container has
+	// none, and git refuses to guess one from root@<container-id>.
+	if err := configureIdentity(repo, cfg); err != nil {
+		return rep, err
+	}
+
 	// Step 1: notes.
 	in := render.Input{
 		Version:    res.Version,
@@ -359,9 +366,6 @@ func writeChangelog(dir, file string, in render.Input, notes string) (bool, erro
 func commitChangelog(repo *git.Repo, cfg *config.Config, res *analyze.Result, o Options,
 	sign, changed bool, log *slog.Logger) (StepStatus, string, string, error) {
 
-	if err := configureIdentity(repo, cfg); err != nil {
-		return StepFailed, err.Error(), "", err
-	}
 	if err := repo.Add(cfg.ReleaseCommit.Assets...); err != nil {
 		return StepFailed, err.Error(), "", err
 	}

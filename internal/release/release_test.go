@@ -516,3 +516,41 @@ hooks:
 		}
 	})
 }
+
+// A fresh CI container has no git identity at all, and an annotated tag records
+// a tagger. The first real pipeline failed here: yasrt configured the identity
+// before the release commit, which is step 4, but the tag is step 3.
+func TestReleaseWorksWithNoGitIdentityConfigured(t *testing.T) {
+	// Cut the test off from the developer's own global and system git config,
+	// so the repository really has no identity to fall back on.
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+	t.Setenv("GITLAB_USER_NAME", "")
+	t.Setenv("GITLAB_USER_EMAIL", "")
+
+	s := setup(t, `
+product: image
+release_commit:
+  author: "release-bot <release-bot@example.invalid>"
+`)
+	s.tr.Git("config", "--unset", "user.name")
+	s.tr.Git("config", "--unset", "user.email")
+
+	rep := run(t, s.opts())
+
+	if got := s.tr.RemoteTags(); !slices.Contains(got, "1.1.0") {
+		t.Fatalf("remote tags = %q", got)
+	}
+	if rep.ReleaseCommit == "" {
+		t.Error("the release commit should also have been made")
+	}
+	// yasrt must have written an identity into the repository itself. The
+	// tagger recorded on the object can still come from ambient GIT_COMMITTER_*
+	// variables, which is the environment's business, not yasrt's.
+	if got := s.tr.Git("config", "user.email"); got != "release-bot@example.invalid" {
+		t.Errorf("user.email = %q, want the configured release author", got)
+	}
+	if got := s.tr.Git("config", "user.name"); got != "release-bot" {
+		t.Errorf("user.name = %q", got)
+	}
+}

@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.6.0](https://git.ole-hartwig.eu/yasrt/cli/compare/1.5.1...1.6.0) (2026-09-11)
+
+### :sparkles: Features
+
+* close the remaining semantic-release gaps ([160d835](https://git.ole-hartwig.eu/yasrt/cli/commit/160d8352f5eb5c002f9407efe700d487dccc7e85))
+
+### :memo: Documentation
+
+* map semantic-release options to yasrt ([243d1ca](https://git.ole-hartwig.eu/yasrt/cli/commit/243d1ca7580a186a92a6ffe312afcbd6350c228f))
+
 ## [1.5.1](https://git.ole-hartwig.eu/yasrt/cli/compare/1.5.0...1.5.1) (2026-09-11)
 
 ### :bug: Fixes

@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.1.0] - 2026-09-11
+
+### :sparkles: Features
+
+- release through the component instead of hand-written jobs (17be092)
+- support prereleases (b7feb8c)
+- sign with SSH or OpenPGP, and check who may release (a73cfe9)
+
+### :bug: Fixes
+
+- use a bare nosemgrep on the armour header (3ed1068)
+- put the semgrep suppression where semgrep looks for it (8ac6639)
+- suppress semgrep on the PGP armour header (81baaf0)
+
+### :memo: Documentation
+
+- record what the pilot found (67a2416)
+- record where the work actually stands (c81d93e)
+- generalise R8 — every tag-triggered job stops firing (3a95f95)
+- record the first real release and what it proved about R1 (6cb6b51)
+
+### :zap: Refactor
+
+- move the image to devops/images/yasrt (ffd82a7)
+
+### :white_check_mark: Tests
+
+- make the intermittent git-log failure self-diagnosing (6a7fa39)
+
 ## [1.0.0] - 2026-09-11
 
 ### :boom: BREAKING CHANGES

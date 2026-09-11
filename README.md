@@ -105,6 +105,7 @@ hooks:
 | `before_tag` | in `release`, before any write | **aborts**, repository untouched |
 | `after_tag` | tag on the remote, release commit not yet made | **aborts** |
 | `after_release` | last, after the forge release and triggers | reported |
+| `on_failure` | when `release` is about to exit non-zero; told `error` and `failed_step` | reported |
 
 `args` are passed verbatim — no shell, so nothing is word-split or
 glob-expanded. `allow_failure` overrides the default either way. Hooks are never
@@ -179,7 +180,8 @@ repository** afterwards if nothing else needs it.
 |---|---|---|---|
 | detected by | `GITLAB_CI` | `GITHUB_ACTIONS` on github.com | `FORGEJO_ACTIONS`, or `GITHUB_SERVER_URL` elsewhere |
 | token | `CI_JOB_TOKEN` | `GITHUB_TOKEN` | `FORGEJO_TOKEN` or `GITHUB_TOKEN` |
-| release links | attached to the release | listed in the release body | listed in the release body |
+| release links (`assets[].url`) | attached to the release | listed in the release body | listed in the release body |
+| uploads (`assets[].path`) | generic package registry, linked from the release | attached to the release | attached to the release |
 | `after_release.triggers` | pipeline trigger API | not available — reported per trigger, exit stays `0` | as GitHub |
 | `yasrt check` authority probe | compares branch and tag protection | not probed | not probed |
 

@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -40,11 +41,28 @@ type fakeGitLab struct {
 	triggers   atomic.Int32
 	failCreate int
 	srv        *httptest.Server
+
+	mu       sync.Mutex
+	uploads  map[string][]byte // "<pkg>/<version>/<file>" -> content
+	linkURLs []string
 }
 
 func newFakeGitLab(t *testing.T) *fakeGitLab {
-	f := &fakeGitLab{releases: map[string]bool{}}
+	f := &fakeGitLab{releases: map[string]bool{}, uploads: map[string][]byte{}}
 	mux := http.NewServeMux()
+
+	mux.HandleFunc("PUT /api/v4/projects/{id}/packages/generic/{pkg}/{ver}/{file}", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("JOB-TOKEN") == "" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		b, _ := io.ReadAll(r.Body)
+		f.mu.Lock()
+		f.uploads[r.PathValue("pkg")+"/"+r.PathValue("ver")+"/"+r.PathValue("file")] = b
+		f.mu.Unlock()
+		w.WriteHeader(http.StatusCreated)
+		io.WriteString(w, `{"message":"201 Created"}`)
+	})
 
 	mux.HandleFunc("GET /api/v4/projects/{id}/releases/{tag}", func(w http.ResponseWriter, r *http.Request) {
 		tag := r.PathValue("tag")
@@ -70,6 +88,13 @@ func newFakeGitLab(t *testing.T) *fakeGitLab {
 		io.WriteString(w, `{"tag_name":"`+tag+`","_links":{"self":"https://git/x/-/releases/`+tag+`"}}`)
 	})
 	mux.HandleFunc("POST /api/v4/projects/{id}/releases/{tag}/assets/links", func(w http.ResponseWriter, r *http.Request) {
+		var req map[string]any
+		b, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(b, &req)
+		u, _ := req["url"].(string)
+		f.mu.Lock()
+		f.linkURLs = append(f.linkURLs, u)
+		f.mu.Unlock()
 		f.links.Add(1)
 		w.WriteHeader(http.StatusCreated)
 	})

@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -80,6 +81,7 @@ type Hooks struct {
 	BeforeTag     []hooks.Hook `yaml:"before_tag"`
 	AfterTag      []hooks.Hook `yaml:"after_tag"`
 	AfterRelease  []hooks.Hook `yaml:"after_release"`
+	OnFailure     []hooks.Hook `yaml:"on_failure"`
 }
 
 // For returns the hooks configured for one event.
@@ -93,6 +95,8 @@ func (h Hooks) For(e hooks.Event) []hooks.Hook {
 		return h.AfterTag
 	case hooks.AfterRelease:
 		return h.AfterRelease
+	case hooks.OnFailure:
+		return h.OnFailure
 	}
 	return nil
 }
@@ -207,7 +211,11 @@ type Deliverability struct {
 }
 
 type Changelog struct {
-	File     string    `yaml:"file"`
+	File string `yaml:"file"`
+	// Title is written as the first line ("# Title") when the file is created
+	// or has no title yet. An existing title is left alone: the file belongs
+	// to the repository, not to the tool.
+	Title    string    `yaml:"title"`
 	Sections []Section `yaml:"sections"`
 }
 
@@ -240,11 +248,24 @@ type GitLabRelease struct {
 	Assets  []ReleaseLink `yaml:"assets"`
 }
 
+// ReleaseLink is one release asset: either a link to something the build
+// published (URL) or a local file yasrt uploads (Path). Not both.
 type ReleaseLink struct {
-	Name     string `yaml:"name"`
-	URL      string `yaml:"url"`
+	Name string `yaml:"name"`
+	URL  string `yaml:"url"`
+	// Path is a glob relative to the repository. Each match is uploaded; the
+	// name is the file's base name unless exactly one file matches and Name
+	// is set.
+	Path string `yaml:"path"`
+	// Package names the GitLab generic package the upload lands in. Defaults
+	// to "release". Ignored on GitHub and Forgejo, which attach files to the
+	// release itself.
+	Package  string `yaml:"package"`
 	LinkType string `yaml:"link_type"`
 }
+
+// IsUpload reports whether the asset is a local file rather than a link.
+func (l ReleaseLink) IsUpload() bool { return l.Path != "" }
 
 type AfterRelease struct {
 	Triggers []Trigger `yaml:"triggers"`
@@ -478,6 +499,18 @@ func (c *Config) validate() error {
 					errs = append(errs, fmt.Errorf("hooks.%s[%d].timeout: %q is not a duration such as \"90s\"", e, i, h.Timeout))
 				}
 			}
+		}
+	}
+	for i, a := range c.GitLabRelease.Assets {
+		switch {
+		case a.URL != "" && a.Path != "":
+			errs = append(errs, fmt.Errorf("gitlab_release.assets[%d]: set url or path, not both", i))
+		case a.URL == "" && a.Path == "":
+			errs = append(errs, fmt.Errorf("gitlab_release.assets[%d]: url or path is required", i))
+		case a.URL != "" && a.Name == "":
+			errs = append(errs, fmt.Errorf("gitlab_release.assets[%d].name: required for a link", i))
+		case a.Path != "" && (filepath.IsAbs(a.Path) || strings.HasPrefix(a.Path, "..")):
+			errs = append(errs, fmt.Errorf("gitlab_release.assets[%d].path: must be relative to the repository", i))
 		}
 	}
 	for i, t := range c.AfterRelease.Triggers {

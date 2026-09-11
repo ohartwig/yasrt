@@ -9,6 +9,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -282,5 +284,204 @@ func TestIncompleteEnvironmentIsReported(t *testing.T) {
 	_, _, err := forge.New(forge.Environment{Kind: forge.GitHub, APIURL: "https://x"}, "")
 	if err == nil || !strings.Contains(err.Error(), "repo=") {
 		t.Errorf("the error should say what is missing: %v", err)
+	}
+}
+
+func TestUploadAssetSpeaksEachAPI(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "yasrt.tar.gz")
+	if err := os.WriteFile(file, []byte("payload"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	up := forge.Upload{Name: "yasrt.tar.gz", Path: file, Package: "yasrt", Version: "1.1.0"}
+
+	t.Run("gitlab puts the file into the generic registry and links it", func(t *testing.T) {
+		var gotMethod, gotPath, gotCT, gotBody string
+		c := clientFor(t, forge.GitLab, func(w http.ResponseWriter, r *http.Request) {
+			gotMethod, gotPath, gotCT = r.Method, r.URL.Path, r.Header.Get("Content-Type")
+			b, _ := io.ReadAll(r.Body)
+			gotBody = string(b)
+			if r.Header.Get("Job-Token") != "tok" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+		})
+		l, err := c.UploadAsset(context.Background(), nil, up)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if gotMethod != http.MethodPut || gotPath != "/api/v4/projects/42/packages/generic/yasrt/1.1.0/yasrt.tar.gz" {
+			t.Errorf("%s %s", gotMethod, gotPath)
+		}
+		if gotCT != "application/octet-stream" || gotBody != "payload" {
+			t.Errorf("content-type %q body %q", gotCT, gotBody)
+		}
+		if !strings.HasSuffix(l.URL, gotPath) || l.LinkType != "package" || l.Name != "yasrt.tar.gz" {
+			t.Errorf("link = %+v", l)
+		}
+	})
+
+	t.Run("gitlab defaults the package name", func(t *testing.T) {
+		var gotPath string
+		c := clientFor(t, forge.GitLab, func(w http.ResponseWriter, r *http.Request) {
+			gotPath = r.URL.Path
+			w.WriteHeader(http.StatusCreated)
+		})
+		u := up
+		u.Package = ""
+		u.LinkType = "other"
+		l, err := c.UploadAsset(context.Background(), nil, u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(gotPath, "/generic/release/1.1.0/") || l.LinkType != "other" {
+			t.Errorf("path %s link %+v", gotPath, l)
+		}
+	})
+
+	t.Run("github posts the raw body to the upload host", func(t *testing.T) {
+		var gotPath, gotCT, gotBody, gotName string
+		uploads := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			gotPath, gotCT, gotName = r.URL.Path, r.Header.Get("Content-Type"), r.URL.Query().Get("name")
+			b, _ := io.ReadAll(r.Body)
+			gotBody = string(b)
+			if r.Header.Get("Authorization") != "Bearer tok" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			io.WriteString(w, `{"browser_download_url":"https://dl/yasrt.tar.gz"}`)
+		}))
+		t.Cleanup(uploads.Close)
+		c := clientFor(t, forge.GitHub, func(w http.ResponseWriter, r *http.Request) {
+			t.Errorf("the API host must not see the upload: %s", r.URL.Path)
+		})
+		rel := &forge.Release{ID: 7, UploadURL: uploads.URL + "/repos/acme/widget/releases/7/assets"}
+		l, err := c.UploadAsset(context.Background(), rel, up)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if gotPath != "/repos/acme/widget/releases/7/assets" || gotName != "yasrt.tar.gz" {
+			t.Errorf("path %s name %s", gotPath, gotName)
+		}
+		if gotCT != "application/octet-stream" || gotBody != "payload" {
+			t.Errorf("content-type %q body %q", gotCT, gotBody)
+		}
+		if l.URL != "https://dl/yasrt.tar.gz" {
+			t.Errorf("link = %+v", l)
+		}
+	})
+
+	t.Run("forgejo posts a multipart form on the api host", func(t *testing.T) {
+		var gotPath, gotField, gotBody string
+		c := clientFor(t, forge.Forgejo, func(w http.ResponseWriter, r *http.Request) {
+			gotPath = r.URL.Path
+			if err := r.ParseMultipartForm(1 << 20); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			for field, fhs := range r.MultipartForm.File {
+				gotField = field
+				f, _ := fhs[0].Open()
+				b, _ := io.ReadAll(f)
+				gotBody = string(b)
+			}
+			io.WriteString(w, `{"browser_download_url":"https://dl/yasrt.tar.gz"}`)
+		})
+		rel := &forge.Release{ID: 9}
+		l, err := c.UploadAsset(context.Background(), rel, up)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if gotPath != "/repos/acme/widget/releases/9/assets" || gotField != "attachment" || gotBody != "payload" {
+			t.Errorf("path %s field %s body %q", gotPath, gotField, gotBody)
+		}
+		if l.URL != "https://dl/yasrt.tar.gz" {
+			t.Errorf("link = %+v", l)
+		}
+	})
+
+	t.Run("failures are reported with the file name", func(t *testing.T) {
+		c := clientFor(t, forge.GitLab, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusForbidden)
+			io.WriteString(w, `{"message":"403 Forbidden"}`)
+		})
+		_, err := c.UploadAsset(context.Background(), nil, up)
+		if err == nil || !strings.Contains(err.Error(), "yasrt.tar.gz") || !strings.Contains(err.Error(), "403") {
+			t.Errorf("err = %v", err)
+		}
+		missing := up
+		missing.Path = filepath.Join(dir, "absent")
+		if _, err := c.UploadAsset(context.Background(), nil, missing); err == nil {
+			t.Error("a missing file must be an error")
+		}
+		isDir := up
+		isDir.Path = dir
+		if _, err := c.UploadAsset(context.Background(), nil, isDir); err == nil || !strings.Contains(err.Error(), "directory") {
+			t.Errorf("a directory must be refused: %v", err)
+		}
+		gh := clientFor(t, forge.GitHub, func(w http.ResponseWriter, r *http.Request) {})
+		if _, err := gh.UploadAsset(context.Background(), nil, up); err == nil {
+			t.Error("github needs the created release")
+		}
+		if _, err := gh.UploadAsset(context.Background(), &forge.Release{ID: 1}, up); err == nil {
+			t.Error("github needs the upload URL")
+		}
+	})
+}
+
+func TestGitHubReleaseCarriesIDAndUploadURL(t *testing.T) {
+	c := clientFor(t, forge.GitHub, func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{"id":123,"tag_name":"1.0.0","html_url":"https://gh/r/1.0.0",`+
+			`"upload_url":"https://uploads.github.com/repos/acme/widget/releases/123/assets{?name,label}"}`)
+	})
+	rel, ok, err := c.GetRelease(context.Background(), "1.0.0")
+	if err != nil || !ok {
+		t.Fatalf("ok=%v err=%v", ok, err)
+	}
+	if rel.ID != 123 || rel.UploadURL != "https://uploads.github.com/repos/acme/widget/releases/123/assets" {
+		t.Errorf("rel = %+v", rel)
+	}
+}
+
+func TestTriggerPipelinePostsToTheTargetProject(t *testing.T) {
+	var gotPath string
+	var body map[string]any
+	c := clientFor(t, forge.GitLab, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath() // the project path must stay encoded
+		b, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(b, &body)
+		io.WriteString(w, `{"id":5,"web_url":"https://h/p/-/pipelines/5"}`)
+	})
+	tr, ok := c.(interface {
+		TriggerPipeline(context.Context, string, string, map[string]string) (string, error)
+	})
+	if !ok {
+		t.Fatal("gitlab client should trigger pipelines")
+	}
+	u, err := tr.TriggerPipeline(context.Background(), "devops/renovate", "main", map[string]string{"X": "1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotPath != "/api/v4/projects/devops%2Frenovate/trigger/pipeline" || u != "https://h/p/-/pipelines/5" {
+		t.Errorf("path %s url %s", gotPath, u)
+	}
+	if body["ref"] != "main" {
+		t.Errorf("body = %+v", body)
+	}
+}
+
+func TestParseKindAndErrors(t *testing.T) {
+	for in, want := range map[string]forge.Kind{"GitLab": forge.GitLab, "github": forge.GitHub, "gitea": forge.Forgejo, "forgejo": forge.Forgejo} {
+		if got, err := forge.ParseKind(in); err != nil || got != want {
+			t.Errorf("ParseKind(%q) = %v, %v", in, got, err)
+		}
+	}
+	if _, err := forge.ParseKind("bitbucket"); err == nil {
+		t.Error("bitbucket is not supported")
+	}
+	e := &forge.APIError{Status: 502, Method: "POST", Path: "/x", Body: strings.Repeat("y", 500)}
+	if s := e.Error(); !strings.Contains(s, "502") || !strings.HasSuffix(s, "…") || !e.Retryable() {
+		t.Errorf("error = %q", s)
 	}
 }

@@ -160,6 +160,29 @@ func TestChangelogWithoutTitle(t *testing.T) {
 	}
 }
 
+// A configured title heads a new or title-less file. A file that already has
+// a title keeps its own: the file belongs to the repository.
+func TestChangelogTitle(t *testing.T) {
+	in := input(commit("aaa1111", "fix: newer thing"))
+	in.Title = "Changelog"
+
+	if got := render.PrependChangelog("", in, render.Notes(in)); !strings.HasPrefix(got, "# Changelog\n\n## [3.4.0]") {
+		t.Errorf("new file:\n%s", got)
+	}
+	got := render.PrependChangelog("## [3.3.2] (2026-08-01)\n\n* old thing\n", in, render.Notes(in))
+	if !strings.HasPrefix(got, "# Changelog\n\n## [3.4.0]") || !strings.Contains(got, "\n## [3.3.2]") {
+		t.Errorf("title-less file:\n%s", got)
+	}
+	got = render.PrependChangelog("# History\n\n## [3.3.2] (2026-08-01)\n", in, render.Notes(in))
+	if !strings.HasPrefix(got, "# History\n") || strings.Contains(got, "# Changelog") {
+		t.Errorf("an existing title must win:\n%s", got)
+	}
+	in.Title = ""
+	if got := render.PrependChangelog("", in, render.Notes(in)); strings.HasPrefix(got, "# ") {
+		t.Errorf("no title unless configured:\n%s", got)
+	}
+}
+
 func TestChangelogHeading(t *testing.T) {
 	got := render.ChangelogHeading(semver.Version{Major: 1, Minor: 2, Patch: 3},
 		time.Date(2026, 9, 11, 13, 30, 0, 0, time.UTC))

@@ -182,6 +182,10 @@
               }
             }
           }
+        },
+        "title": {
+          "type": "string",
+          "description": "Written as the first line (\"# Title\") when the changelog is created or has no title yet. A file that already has one keeps it."
         }
       }
     },
@@ -239,18 +243,15 @@
           "description": "Release name. ${version} and ${tag} are substituted."
         },
         "assets": {
-          "description": "Links attached to the release. GitLab attaches them as release links; GitHub and Forgejo have no such endpoint, so they are appended to the release body as an Assets list.",
+          "description": "Release assets: links to what the build published (url) or local files yasrt uploads (path). GitLab attaches links; GitHub and Forgejo list links in the release body and attach uploads.",
           "type": "array",
           "items": {
             "type": "object",
-            "required": [
-              "name",
-              "url"
-            ],
             "additionalProperties": false,
             "properties": {
               "name": {
-                "type": "string"
+                "type": "string",
+                "description": "Link name, or file name for a single-file upload. Required for a link; defaults to the file's base name for an upload."
               },
               "url": {
                 "type": "string"
@@ -263,8 +264,40 @@
                   "image",
                   "package"
                 ]
+              },
+              "path": {
+                "type": "string",
+                "description": "Glob, relative to the repository, of files to upload. GitLab stores them in the generic package registry and links them from the release; GitHub and Forgejo attach them to the release. Alternative to url."
+              },
+              "package": {
+                "type": "string",
+                "default": "release",
+                "description": "GitLab generic package name the upload lands in. Ignored on GitHub and Forgejo."
               }
-            }
+            },
+            "oneOf": [
+              {
+                "required": [
+                  "url",
+                  "name"
+                ],
+                "not": {
+                  "required": [
+                    "path"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "path"
+                ],
+                "not": {
+                  "required": [
+                    "url"
+                  ]
+                }
+              }
+            ]
           }
         }
       }
@@ -450,6 +483,43 @@
               }
             }
           }
+        },
+        "on_failure": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "run"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "run": {
+                "type": "string",
+                "description": "Executable. Resolved relative to the repository when it starts with ./ or ../, through PATH otherwise."
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Passed verbatim; no shell is involved."
+              },
+              "name": {
+                "type": "string",
+                "description": "Label used in logs and in the release report."
+              },
+              "timeout": {
+                "type": "string",
+                "description": "Go duration such as 90s or 5m. Default 5m.",
+                "pattern": "^[0-9]+(ns|us|ms|s|m|h)$"
+              },
+              "allow_failure": {
+                "type": "boolean",
+                "description": "Overrides the per-event default: fatal for before_tag and after_tag, tolerated for after_analysis and after_release."
+              }
+            }
+          },
+          "description": "Run when `yasrt release` is about to fail. The hook is told the error and the failed step (YASRT_ERROR, YASRT_FAILED_STEP; error and failed_step in the JSON). Its own failure is logged and changes nothing."
         }
       }
     }

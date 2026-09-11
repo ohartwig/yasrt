@@ -38,6 +38,8 @@ type Input struct {
 	// per forge — a merge request is a pull request elsewhere — so they come
 	// from the forge rather than being assembled here.
 	URLs forge.URLs
+	// Title, when set, heads a changelog that has none yet.
+	Title string
 }
 
 // refRE finds issue (#12) and merge request (!34) references.
@@ -177,18 +179,33 @@ func PrependChangelog(existing string, in Input, notes string) string {
 	block := headingFor(in.Version, in.Date, in.URLs, in.Previous, in.Tag) +
 		"\n\n" + strings.TrimRight(notes, "\n") + "\n"
 
-	// No document title: the estate's changelogs start straight at the first
-	// release heading, and adding one would put a line above every existing
-	// file's history at the moment it migrates.
+	// No document title by default: the estate's changelogs start straight at
+	// the first release heading, and adding one would put a line above every
+	// existing file's history at the moment it migrates. A configured title is
+	// added only where none exists; a file that has one keeps it.
+	title := ""
+	if t := strings.TrimSpace(in.Title); t != "" {
+		title = "# " + t + "\n"
+	}
 	if strings.TrimSpace(existing) == "" {
+		if title != "" {
+			return title + "\n" + block
+		}
 		return block
 	}
 
 	head, rest := splitTitle(existing)
 	if head == "" {
-		return block + "\n" + strings.TrimLeft(existing, "\n")
+		return title + sep(title) + block + "\n" + strings.TrimLeft(existing, "\n")
 	}
 	return head + "\n" + block + "\n" + strings.TrimLeft(rest, "\n")
+}
+
+func sep(title string) string {
+	if title == "" {
+		return ""
+	}
+	return "\n"
 }
 
 // splitTitle separates a leading "# Title" plus any prose before the first

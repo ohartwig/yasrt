@@ -44,10 +44,14 @@ const (
 	// AfterRelease runs last. Failures are reported and never fatal, because
 	// the release has already happened.
 	AfterRelease Event = "after_release"
+	// OnFailure runs when `yasrt release` is about to exit with an error, so
+	// that somebody can be told. It is told what failed. Its own failure is
+	// logged and changes nothing: the release is already lost.
+	OnFailure Event = "on_failure"
 )
 
 // Events lists every supported hook point, in the order they occur.
-func Events() []Event { return []Event{AfterAnalysis, BeforeTag, AfterTag, AfterRelease} }
+func Events() []Event { return []Event{AfterAnalysis, BeforeTag, AfterTag, AfterRelease, OnFailure} }
 
 // DefaultTimeout bounds a single hook.
 const DefaultTimeout = 5 * time.Minute
@@ -95,7 +99,7 @@ func (h Hook) fatal(e Event) bool {
 	if h.AllowFailure != nil {
 		return !*h.AllowFailure
 	}
-	return e != AfterRelease && e != AfterAnalysis
+	return e != AfterRelease && e != AfterAnalysis && e != OnFailure
 }
 
 // Context is what a hook is told. It carries no credentials: a hook that needs
@@ -113,6 +117,9 @@ type Context struct {
 	ProjectURL string   `json:"project_url,omitzero"`
 	Breaking   []string `json:"breaking_changes,omitzero"`
 	DryRun     bool     `json:"dry_run,omitzero"`
+	// Error and FailedStep are set for on_failure only.
+	Error      string `json:"error,omitzero"`
+	FailedStep string `json:"failed_step,omitzero"`
 }
 
 // Result records one hook run, for the release report.
@@ -215,5 +222,7 @@ func envFor(c Context) []string {
 		"RELEASE_BUMP=" + c.Bump,
 		"RELEASE_REASON=" + c.Reason,
 		"RELEASE_COMMIT=" + c.Commit,
+		"YASRT_ERROR=" + c.Error,
+		"YASRT_FAILED_STEP=" + c.FailedStep,
 	}
 }

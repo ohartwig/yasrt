@@ -63,7 +63,7 @@ available, with the reason · **+** yasrt only.
 | semantic-release | yasrt | |
 |---|---|---|
 | `changelogFile` | `changelog.file` (default `CHANGELOG.md`) | ✓ |
-| `changelogTitle` | — | ✗ The estate's files have no title; adding one would put a line above every history at migration time. Open item, cheap to add if wanted. |
+| `changelogTitle` | `changelog.title` | ✓ Written only where the file has no title yet; an existing title is kept. |
 
 ## `@semantic-release/git`
 
@@ -84,7 +84,7 @@ available, with the reason · **+** yasrt only.
 | `GL_TOKEN` / `GITLAB_TOKEN` | — | ✗ Deliberately: job token only. |
 | `useJobToken`, `CI_JOB_TOKEN` | always | ✓ |
 | `assets[]` with `url` | `gitlab_release.assets[]` (`name`, `url`, `link_type`) | ✓ |
-| `assets[]` with `path` (upload to project uploads / generic package registry) | — | ✗ Publishing files is a build-job concern; link to what the build published. |
+| `assets[]` with `path`, `target: generic_package`, `packageName` | `gitlab_release.assets[].path`, `package` | ✓ Generic package registry only — the one upload target a job token may write to. `project_upload` is not offered. |
 | `milestones` | — | ✗ Not used in the estate; `after_release` hook if needed. |
 | `successComment`, `successCommentCondition`, `failComment`, `failTitle`, `failCommentCondition`, `labels`, `assignee` | — | ✗ Issue/MR commenting. Not used here; an `after_release` hook has the release context on stdin and can do it. |
 | `retryLimit` | fixed: 3 attempts, exponential backoff, on 5xx and 429 | ≈ |
@@ -98,7 +98,7 @@ available, with the reason · **+** yasrt only.
 |---|---|---|
 | `githubUrl`, `githubApiPathPrefix`, `githubApiUrl`, `GITHUB_URL`, `GITHUB_API_URL` | `GITHUB_SERVER_URL`, `GITHUB_API_URL` | ≈ Detected; GHES works through the same variables. |
 | `GITHUB_TOKEN` / `GH_TOKEN` | `GITHUB_TOKEN` (`FORGEJO_TOKEN` on Forgejo) | ✓ The workflow's own token, `contents: write`. |
-| `assets[]` (file upload) | `gitlab_release.assets[]` → `### Assets` list in the release body | ≈ Links, not uploads. Same block as for GitLab, so a repository moving between forges keeps its configuration. |
+| `assets[]` (file upload) | `gitlab_release.assets[].path` | ✓ Attached to the release. `url` entries become an `### Assets` list in the body. Same block as for GitLab, so a repository moving between forges keeps its configuration. |
 | `releaseNameTemplate` | `gitlab_release.name` | ✓ |
 | `releaseBodyTemplate` | — | ✗ Body is the notes (+ assets). |
 | `draftRelease` | — | ✗ Tag is confirmation; a draft would announce first. |
@@ -123,7 +123,7 @@ context as JSON on stdin plus `RELEASE_*` variables. Each hook has `name`,
 | `publishCmd` | `hooks.after_tag` | ✓ The tag is on the remote; the release commit is not yet made. Fatal on failure. |
 | `addChannelCmd` | — | ✗ No channels. |
 | `successCmd` | `hooks.after_release` | ✓ Reported, never fatal. |
-| `failCmd` | — | ✗ Open item; failure notification currently comes from the pipeline itself. |
+| `failCmd` | `hooks.on_failure` | ✓ Told `error` and `failed_step`; never fatal itself. |
 | `shell` | — | ✗ No shell by design; wrap in a script if one is needed. |
 | `execCwd` | — | ✗ Runs in the repository root. |
 
@@ -141,7 +141,7 @@ context as JSON on stdin plus `RELEASE_*` variables. Each hook has `name`,
 - The plugin ecosystem itself (`npm`, `pypi`, `docker`, `slack`, …). Everything
   publishing-shaped stays in build jobs or becomes a hook.
 - Distribution channels (`next`, `channel`) — an npm dist-tag concept.
-- Release assets as **uploads**; yasrt links.
+- Release assets as **project uploads** (`target: project_upload`); yasrt
+  uploads to the generic package registry, which a job token may write to.
 - Issue and merge-request comments, labels, milestones, draft releases,
   discussions.
-- `failCmd` and `changelogTitle` — both small; add them when a repository asks.

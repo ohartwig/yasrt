@@ -270,7 +270,7 @@ weakness already documented for the Renovate and melange keys. Carried as an exp
 the SSH-signing-via-OIDC path as the exit; `sign: auto` degrades to unsigned so the key is never
 load-bearing for a release.
 
-**R8 — Every tag-triggered job stops firing.** *(open, affects far more than image repos)*
+**R8 — Every tag-triggered job stops firing.** *(resolved for images on 2026-09-11; satellites in !204)*
 Jobs that fire on `rules: if: $CI_COMMIT_TAG` work today because
 `semantic-release` pushes the tag with a credential that starts pipelines.
 `CI_JOB_TOKEN` deliberately does not — that is loop guard 1, and it is what lets
@@ -290,6 +290,20 @@ The fix is uniform: the job moves into the release pipeline, runs after
 in the release-tools README (MR !203). This is real per-repo migration work that
 the first draft of this plan did not account for, and it is the single largest
 item in P8 and P9.
+
+*Resolution for image repositories.* The default-branch pipeline **is** the
+release pipeline. `buildkit-image-build` 2.4.0 takes `release-tool: yasrt`:
+build, scan, sign, attest, verify and the release check all run on the push to
+the default branch and read `RELEASE_STATUS` / `RELEASE_TAG` from `version`
+(the build re-exports them through `build.env`, because the later jobs declare
+`needs` on the build alone). A push that decided against a release leaves every
+one of them green with "nothing to do". `release-tools` 1.21.0 adds
+`release-needs`, so `release` in `.post` waits for the whole chain, and
+`golden-image` exposes it as one input. The consumer's own `rules:` on
+`build:buildkit:image` and `container_scanning` must admit the default branch —
+that is the per-repository part. Proven by `devops/images/yasrt` 1.4.0: tag on
+the merge commit, image signed and verified before the tag existed, no tag
+pipeline, no release-commit pipeline, 11 s of build.
 
 **R7 — First `golangci-lint` and `govulncheck` in the estate** (§2.11). No config to inherit, and
 adding them to `composed-default-pipelines/go` would affect the two other Go consumers. Start local to

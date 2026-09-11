@@ -6,11 +6,22 @@ phase, tasks are ordered by dependency unless marked *(parallel)*.
 
 Legend: `[ ]` open · `[x]` done · `[~]` in progress · `[!]` blocked
 
-Status as of 2026-09-11: **P0–P6 and P11 are done and proven in production.**
-`yasrt/cli` released itself as **1.0.0** through its own pipeline: tag on the
-built commit, release commit on top, GitLab release with rendered notes,
-binaries in the generic package registry. What remains needs other repositories
-or estate-wide decisions, and is marked `[ ]`, `[~]` or `[!]`.
+Status as of 2026-09-11. **Everything that does not depend on someone else's
+review is done.**
+
+- `yasrt/cli` **1.0.0**, released by itself. 156 tests, 77.2 % coverage,
+  golangci-lint clean.
+- `devops/images/yasrt` **1.0.0**, built, cosign-signed, CycloneDX attested,
+  container-scanned. `registry.ole-hartwig.eu/devops/images/yasrt:1` pulls and
+  runs.
+- Prereleases (P10) and hooks (P11) implemented.
+- Three merge requests open and waiting on review:
+  - `release-tools!203` — the `yasrt` and `yasrt-preview` templates (additive)
+  - `release-tools!204` — the three publish templates survive the migration
+  - `gitlab-profile!482` — the handbook transition, DCS-26, I-081
+
+**The pilot (P8) is blocked on !203**, not on work: the component version `@1`
+does not exist until it merges, and component changes need two reviewers.
 
 ---
 
@@ -243,7 +254,10 @@ or estate-wide decisions, and is marked `[ ]`, `[~]` or `[!]`.
       *Done when:* every non-prerelease repo releases through YASRT.
 - [ ] **T-122** Replace `RENOVATE_TRIGGER_TOKEN` with `after_release.triggers` using `JOB-TOKEN`.
       *Done when:* the token is deleted and fast-lane Renovate pipelines still fire.
-- [ ] **T-123** Update the handbook pages that describe the current release process:
+- [~] **T-123** Handbook updated in `gitlab-profile!482` — the transition section in
+      `release-management.md` (with the identity invariant), DCS-26, I-081, and the job
+      catalogue. The remaining pages cross-reference those rather than restating them.
+      Original list:
       `igs/engineering/release-management.md`, `igs/engineering/ci-cd-security.md`,
       `igs/security/secure-development.md`, `igs/engineering/commit-signing-policy.md`,
       `engineering/ci-cd-jobs.md`, `igs/security/vulnerability-management.md`,
@@ -275,8 +289,9 @@ or estate-wide decisions, and is marked `[ ]`, `[~]` or `[!]`.
       running once tags are pushed with a job token; `cleanup-release-tags` is unaffected.
       The migration is uniform — run after `release` and read `$RELEASE_TAG`, or become an
       `after_release` hook — and is documented with a before/after in the release-tools README.
-- [ ] **T-145** Rewrite the three affected templates so they no longer depend on a tag pipeline.
-      *Done when:* each publishes from the release pipeline and a consuming repository proves it.
+- [~] **T-145** Done in `release-tools!204`: all three take `${CI_COMMIT_TAG:-$RELEASE_TAG}`,
+      `release:packagist` gains the prerelease exclusion in-script because rules cannot see the
+      handshake. Awaiting review; a consuming repository proves it during the pilot.
 
 ## P10 — Prereleases, then decommissioning
 

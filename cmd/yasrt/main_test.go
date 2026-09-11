@@ -21,8 +21,23 @@ type fixture struct {
 	envPath string
 }
 
+// ambientGitLabVars are set for real when the suite runs inside a GitLab job.
+// A test that left them in place would build a live API client and publish to
+// whichever project it happened to be running in — which is exactly what the
+// first CI run tried to do.
+var ambientGitLabVars = []string{
+	"CI_API_V4_URL", "CI_PROJECT_ID", "CI_PROJECT_URL", "CI_JOB_TOKEN",
+	"CI_DEFAULT_BRANCH", "CI_SERVER_HOST", "GPG_SEM_REL_B64",
+	"GITLAB_USER_NAME", "GITLAB_USER_EMAIL",
+	output.KeyStatus, output.KeyVersion, output.KeyTag,
+	output.KeyPrevious, output.KeyBump, output.KeyReason, output.KeyCommit,
+}
+
 func newFixture(t *testing.T, cfg string) *fixture {
 	t.Helper()
+	for _, k := range ambientGitLabVars {
+		t.Setenv(k, "")
+	}
 	tr := testrepo.New(t)
 	tr.Write(".yasrt.yaml", cfg)
 	tr.Git("add", "-A")

@@ -181,7 +181,8 @@
         },
         "message": {
           "type": "string",
-          "default": "chore(release): ${version}"
+          "default": "chore(release): ${version}",
+          "description": "Release-commit subject. ${version} and ${tag} are substituted."
         },
         "assets": {
           "type": "array",
@@ -203,7 +204,8 @@
           "type": "string",
           "examples": [
             "release-bot <release-bot@example.invalid>"
-          ]
+          ],
+          "description": "Identity for the release commit. Defaults to KOH Release Bot <release-bot@ole-hartwig.eu>; a release commit is made by automation, not by whoever merged."
         }
       }
     },
@@ -217,7 +219,8 @@
         },
         "name": {
           "type": "string",
-          "default": "${version}"
+          "default": "${version}",
+          "description": "Release name. ${version} and ${tag} are substituted."
         },
         "assets": {
           "type": "array",
@@ -274,7 +277,8 @@
                 "type": "object",
                 "additionalProperties": {
                   "type": "string"
-                }
+                },
+                "description": "Variables passed to the target pipeline. ${version}, ${tag} and $ENV references are substituted. The estate's renovate contract is RELEASED_PACKAGE and RELEASED_VERSION (the tag)."
               }
             }
           }

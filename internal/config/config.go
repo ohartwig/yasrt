@@ -38,8 +38,19 @@ const (
 // second of the three loop guards (SPEC §6.3).
 const ReleaseScope = "release"
 
-// VersionPlaceholder is what tag_format and the message templates substitute.
-const VersionPlaceholder = "${version}"
+// DefaultReleaseAuthor is the identity release commits are made under when a
+// repository does not name its own. It continues the identity the npm
+// component used, so history stays attributable across the migration.
+const DefaultReleaseAuthor = "KOH Release Bot <release-bot@ole-hartwig.eu>"
+
+// Placeholders substituted in tag_format and in the message templates.
+const (
+	VersionPlaceholder = "${version}"
+	// TagPlaceholder matters wherever the two differ: with a v-prefixed
+	// tag_format, "2.5.1" and "v2.5.1" are not interchangeable, and the
+	// estate's renovate trigger sends the tag, not the version.
+	TagPlaceholder = "${tag}"
+)
 
 type Config struct {
 	Version        int            `yaml:"version"`
@@ -291,6 +302,12 @@ func (c *Config) applyDefaults() {
 	if c.ReleaseCommit.Sign == "" {
 		c.ReleaseCommit.Sign = SignAuto
 	}
+	if c.ReleaseCommit.Author == "" {
+		// A release commit is made by automation, not by whoever happened to
+		// merge. Overridable per repository; this only stops the default from
+		// being a person.
+		c.ReleaseCommit.Author = DefaultReleaseAuthor
+	}
 	if c.GitLabRelease.Enabled == nil {
 		t := true
 		c.GitLabRelease.Enabled = &t
@@ -407,8 +424,9 @@ func (c *Config) VersionFromTag(tag string) (semver.Version, bool) {
 	return v, true
 }
 
-// Expand substitutes ${version} in a template such as the release-commit
-// message or the GitLab release name.
-func Expand(tmpl string, v semver.Version) string {
-	return strings.ReplaceAll(tmpl, VersionPlaceholder, v.String())
+// Expand substitutes ${version} and ${tag} in a template such as the
+// release-commit message, the GitLab release name, or a trigger variable.
+func Expand(tmpl string, v semver.Version, tag string) string {
+	out := strings.ReplaceAll(tmpl, VersionPlaceholder, v.String())
+	return strings.ReplaceAll(out, TagPlaceholder, tag)
 }

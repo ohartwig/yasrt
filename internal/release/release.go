@@ -13,6 +13,7 @@ package release
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json/v2"
 	"errors"
 	"fmt"
@@ -188,10 +189,11 @@ func Run(ctx context.Context, o Options) (*Report, error) {
 
 	// Signing must be decided before anything is pushed, so that `required`
 	// fails while the repository is still untouched.
-	sign, err := setupSigning(repo, cfg, o.GPGKeyB64, log)
+	sign, cleanupKey, err := setupSigning(repo, cfg, o.GPGKeyB64, log)
 	if err != nil {
 		return rep, err
 	}
+	defer cleanupKey()
 	rep.Signed = sign
 
 	// An annotated tag records a tagger, so the identity has to exist before
@@ -378,7 +380,7 @@ func commitChangelog(repo *git.Repo, cfg *config.Config, res *analyze.Result, o 
 		return StepSkipped, "no changes to commit", "", nil
 	}
 
-	msg := config.Expand(cfg.ReleaseCommit.Message, res.Version)
+	msg := config.Expand(cfg.ReleaseCommit.Message, res.Version, res.Tag)
 	if err := repo.Commit(msg, cfg.ReleaseCommit.Author, sign); err != nil {
 		return StepFailed, err.Error(), "", err
 	}
@@ -418,7 +420,7 @@ func publishRelease(ctx context.Context, o Options, cfg *config.Config, res *ana
 
 	rel, err := o.Client.CreateRelease(ctx, gitlab.CreateReleaseRequest{
 		TagName:     res.Tag,
-		Name:        config.Expand(cfg.GitLabRelease.Name, res.Version),
+		Name:        config.Expand(cfg.GitLabRelease.Name, res.Version, res.Tag),
 		Description: notes,
 	})
 	if err != nil {
@@ -428,8 +430,8 @@ func publishRelease(ctx context.Context, o Options, cfg *config.Config, res *ana
 
 	for _, a := range cfg.GitLabRelease.Assets {
 		l := gitlab.Link{
-			Name:     config.Expand(a.Name, res.Version),
-			URL:      config.Expand(a.URL, res.Version),
+			Name:     config.Expand(a.Name, res.Version, res.Tag),
+			URL:      config.Expand(a.URL, res.Version, res.Tag),
 			LinkType: a.LinkType,
 		}
 		if err := o.Client.AddReleaseLink(ctx, res.Tag, l); err != nil {
@@ -453,7 +455,7 @@ func runTriggers(ctx context.Context, o Options, cfg *config.Config, res *analyz
 		}
 		vars := make(map[string]string, len(t.Variables)+2)
 		for k, v := range t.Variables {
-			vars[k] = expandEnv(config.Expand(v, res.Version))
+			vars[k] = expandEnv(config.Expand(v, res.Version, res.Tag))
 		}
 		p, err := o.Client.TriggerPipeline(ctx, t.Project, t.Ref, vars)
 		if err != nil {
@@ -529,20 +531,31 @@ func authenticatedURL(repo *git.Repo, remote, token string) (string, error) {
 	return url, nil
 }
 
-// setupSigning imports the optional GPG key and configures git to use it.
-// auto degrades to unsigned; required fails here, before anything is written.
-func setupSigning(repo *git.Repo, cfg *config.Config, keyB64 string, log *slog.Logger) (bool, error) {
+// Signing key formats. Which one a key is gets detected from the material
+// itself rather than configured: an OpenSSH private key and an armoured PGP
+// block are unmistakable, and one fewer knob is one fewer thing to get wrong.
+const (
+	sshKeyHeader = "-----BEGIN OPENSSH PRIVATE KEY-----"
+	pgpKeyHeader = "-----BEGIN PGP PRIVATE KEY BLOCK-----"
+)
+
+// setupSigning prepares the optional signing key and tells git to use it.
+// `auto` degrades to unsigned; `required` fails here, before anything is
+// written. The returned cleanup removes any key material written to disk.
+func setupSigning(repo *git.Repo, cfg *config.Config, keyB64 string, log *slog.Logger) (bool, func(), error) {
+	noop := func() {}
+
 	// Deciding not to sign has to be stated, not merely left unsaid: a global
 	// or system git config with commit.gpgsign or tag.gpgsign true would
 	// otherwise try to sign with a key this job does not have, and a hardware
 	// key would sit waiting for a touch that never comes.
-	unsigned := func() (bool, error) {
+	unsigned := func() (bool, func(), error) {
 		for _, k := range []string{"commit.gpgsign", "tag.gpgsign"} {
 			if err := repo.Config(k, "false"); err != nil {
-				return false, err
+				return false, noop, err
 			}
 		}
-		return false, nil
+		return false, noop, nil
 	}
 
 	switch cfg.ReleaseCommit.Sign {
@@ -551,49 +564,123 @@ func setupSigning(repo *git.Repo, cfg *config.Config, keyB64 string, log *slog.L
 	case config.SignAuto, config.SignRequired:
 	}
 
+	required := cfg.ReleaseCommit.Sign == config.SignRequired
+
 	if strings.TrimSpace(keyB64) == "" {
-		if cfg.ReleaseCommit.Sign == config.SignRequired {
-			return false, fmt.Errorf("%w: no key was provided", ErrSigningRequired)
+		if required {
+			return false, noop, fmt.Errorf("%w: no key was provided", ErrSigningRequired)
 		}
 		log.Info("no signing key present, continuing unsigned")
 		return unsigned()
 	}
 
-	keyID, err := importGPGKey(keyB64)
+	key, err := decodeKey(keyB64)
 	if err != nil {
-		if cfg.ReleaseCommit.Sign == config.SignRequired {
-			return false, fmt.Errorf("%w: %w", ErrSigningRequired, err)
+		if required {
+			return false, noop, fmt.Errorf("%w: %w", ErrSigningRequired, err)
 		}
 		log.Warn("signing key unusable, continuing unsigned", "err", err)
 		return unsigned()
 	}
-	if err := repo.Config("user.signingkey", keyID); err != nil {
-		return false, err
+
+	var cleanup func()
+	switch {
+	case strings.Contains(key, sshKeyHeader):
+		cleanup, err = configureSSHSigning(repo, key)
+	case strings.Contains(key, pgpKeyHeader):
+		cleanup, err = configureGPGSigning(repo, key)
+	default:
+		err = errors.New("key is neither an OpenSSH private key nor an armoured PGP block")
 	}
-	if err := repo.Config("gpg.format", "openpgp"); err != nil {
-		return false, err
+	if err != nil {
+		if required {
+			return false, noop, fmt.Errorf("%w: %w", ErrSigningRequired, err)
+		}
+		log.Warn("signing key unusable, continuing unsigned", "err", err)
+		if cleanup != nil {
+			cleanup()
+		}
+		return unsigned()
 	}
-	log.Info("signing enabled", "key", keyID)
-	return true, nil
+	log.Info("signing enabled", "format", formatOf(key))
+	return true, cleanup, nil
 }
 
-// importGPGKey imports a base64-encoded armoured key and returns its id. The
-// key is base64-encoded because GitLab's variable masking mangles multi-line
-// armour, which is the same reason the npm component encoded it.
-func importGPGKey(b64 string) (string, error) {
-	dec := exec.Command("base64", "-d")
-	dec.Stdin = strings.NewReader(b64)
-	key, err := dec.Output()
+func formatOf(key string) string {
+	if strings.Contains(key, sshKeyHeader) {
+		return "ssh"
+	}
+	return "openpgp"
+}
+
+// decodeKey accepts the key base64-encoded, which is how it survives GitLab's
+// variable masking — armour is multi-line and gets mangled otherwise — but also
+// accepts raw armour, so a locally exported key works without ceremony.
+func decodeKey(v string) (string, error) {
+	v = strings.TrimSpace(v)
+	if strings.Contains(v, "-----BEGIN") {
+		return v, nil
+	}
+	raw, err := base64.StdEncoding.DecodeString(strings.Join(strings.Fields(v), ""))
 	if err != nil {
 		return "", fmt.Errorf("decoding the signing key: %w", err)
 	}
-	imp := exec.Command("gpg", "--batch", "--import")
-	imp.Stdin = strings.NewReader(string(key))
-	if out, err := imp.CombinedOutput(); err != nil {
-		return "", fmt.Errorf("importing the signing key: %w: %s", err, out)
+	return string(raw), nil
+}
+
+// configureSSHSigning writes the key to a private file and points git at it.
+// GitLab verifies SSH signatures, and the estate already trusts SSH keys for
+// human commits through .gitsigners, so this is the format with a future.
+func configureSSHSigning(repo *git.Repo, key string) (func(), error) {
+	dir, err := os.MkdirTemp("", "yasrt-signing-")
+	if err != nil {
+		return nil, err
 	}
-	list := exec.Command("gpg", "--list-secret-keys", "--with-colons")
-	out, err := list.Output()
+	cleanup := func() { _ = os.RemoveAll(dir) }
+
+	path := filepath.Join(dir, "signing_key")
+	// ssh-keygen refuses a key file that others can read, and so does git.
+	if err := os.WriteFile(path, []byte(ensureTrailingNewline(key)), 0o600); err != nil {
+		cleanup()
+		return nil, err
+	}
+	for _, kv := range [][2]string{
+		{"gpg.format", "ssh"},
+		{"user.signingkey", path},
+	} {
+		if err := repo.Config(kv[0], kv[1]); err != nil {
+			cleanup()
+			return nil, err
+		}
+	}
+	return cleanup, nil
+}
+
+// configureGPGSigning imports an armoured key into the ambient keyring and
+// selects it. The keyring is the job's own and disappears with the container.
+func configureGPGSigning(repo *git.Repo, key string) (func(), error) {
+	imp := exec.Command("gpg", "--batch", "--import")
+	imp.Stdin = strings.NewReader(key)
+	if out, err := imp.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("importing the signing key: %w: %s", err, out)
+	}
+	keyID, err := firstSecretKeyID()
+	if err != nil {
+		return nil, err
+	}
+	for _, kv := range [][2]string{
+		{"gpg.format", "openpgp"},
+		{"user.signingkey", keyID},
+	} {
+		if err := repo.Config(kv[0], kv[1]); err != nil {
+			return nil, err
+		}
+	}
+	return func() {}, nil
+}
+
+func firstSecretKeyID() (string, error) {
+	out, err := exec.Command("gpg", "--list-secret-keys", "--with-colons").Output()
 	if err != nil {
 		return "", fmt.Errorf("listing secret keys: %w", err)
 	}
@@ -603,6 +690,13 @@ func importGPGKey(b64 string) (string, error) {
 		}
 	}
 	return "", errors.New("no secret key found after import")
+}
+
+func ensureTrailingNewline(s string) string {
+	if strings.HasSuffix(s, "\n") {
+		return s
+	}
+	return s + "\n"
 }
 
 // WriteReport saves the report as a job artefact.

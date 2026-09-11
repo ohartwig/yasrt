@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json/v2"
 	"flag"
 	"fmt"
@@ -13,6 +14,8 @@ import (
 	"git.ole-hartwig.eu/yasrt/cli/internal/config"
 	"git.ole-hartwig.eu/yasrt/cli/internal/deliver"
 	"git.ole-hartwig.eu/yasrt/cli/internal/git"
+	"git.ole-hartwig.eu/yasrt/cli/internal/gitlab"
+	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
 )
 
 // checkRef is the throwaway ref used to prove that pushing works. It is deleted
@@ -117,6 +120,17 @@ func cmdCheck(args []string) error {
 		add("remote", true, true, git.MaskURLCredentials(url))
 	}
 
+	// The release-authority invariant. This is the check that answers, per
+	// repository, the question the design otherwise leaves open.
+	if apiURL != "" && projectID != "" && token != "" && cfg != nil {
+		out = append(out, probeReleaseAuthority(
+			gitlab.New(apiURL, projectID, token), cfg,
+			firstNonEmptyStr(os.Getenv("CI_DEFAULT_BRANCH"), "main")))
+	} else {
+		add("release authority", true, false,
+			"not probed; needs CI_API_V4_URL, CI_PROJECT_ID and CI_JOB_TOKEN")
+	}
+
 	// Push permission. This is the one probe that writes, so it is opt-in: the
 	// rest of `check` is safe to run anywhere.
 	if probePush {
@@ -164,6 +178,97 @@ func probePushPermission(repo *git.Repo, remote, token string) checkResult {
 	}
 	return checkResult{Name: "push permission", OK: true,
 		Detail: "the token may push; note that protected-tag creation is a separate permission"}
+}
+
+// probeReleaseAuthority compares who may merge into the default branch with who
+// may create the release tag.
+//
+// A CI_JOB_TOKEN push acts as the user who triggered the pipeline, and on the
+// default branch that is whoever merged. So the tag push succeeds exactly when
+// the weakest role allowed to merge is also allowed to create the tag. If
+// merging is Maintainer-only, a Maintainer-only protected tag is consistent and
+// nothing needs weakening; if Developers may merge but not tag, every release
+// they trigger dies at the tag push, and the repository is misconfigured rather
+// than yasrt being at fault.
+func probeReleaseAuthority(c *gitlab.Client, cfg *config.Config, defaultBranch string) checkResult {
+	ctx := context.Background()
+	const name = "release authority"
+
+	branches, err := c.ListProtectedBranches(ctx)
+	if err != nil {
+		// Never fall through to "unprotected" here: not being able to look is
+		// not the same as there being nothing to see.
+		return checkResult{Name: name, Fatal: true, Detail: "could not read the branch protection rules: " + err.Error()}
+	}
+	var branch *gitlab.ProtectedBranch
+	for i := range branches {
+		if tagRuleMatches(branches[i].Name, defaultBranch) {
+			branch = &branches[i]
+			break
+		}
+	}
+	if branch == nil {
+		return checkResult{Name: name, OK: true, Detail: fmt.Sprintf(
+			"%s is not protected, so anyone who can push can release", defaultBranch)}
+	}
+	mergeLevel := branch.LowestMergeLevel()
+
+	tags, err := c.ListProtectedTags(ctx)
+	if err != nil {
+		return checkResult{Name: name, Fatal: true, Detail: "could not read the protected-tag rules: " + err.Error()}
+	}
+	rule, matched := matchingTagRule(tags, cfg)
+	if !matched {
+		return checkResult{Name: name, OK: true, Detail: fmt.Sprintf(
+			"no protected-tag rule matches %s; tag creation is unrestricted", cfg.TagFormatString())}
+	}
+	createLevel := rule.LowestCreateLevel()
+
+	if createLevel > mergeLevel {
+		return checkResult{Name: name, Fatal: true, Detail: fmt.Sprintf(
+			"%s may merge into %s but only %s may create tags matching %q — a release triggered by %s will fail at the tag push. "+
+				"Either restrict merging to %s, or allow %s to create that tag.",
+			mergeLevel, defaultBranch, createLevel, rule.Name, mergeLevel, createLevel, mergeLevel)}
+	}
+	return checkResult{Name: name, OK: true, Detail: fmt.Sprintf(
+		"%s may merge into %s and %s may create %q — consistent",
+		mergeLevel, defaultBranch, createLevel, rule.Name)}
+}
+
+// matchingTagRule finds the protected-tag rule that governs the tags yasrt
+// creates. GitLab rules are wildcards; the tag format's fixed prefix is enough
+// to tell which one applies.
+func matchingTagRule(tags []gitlab.ProtectedTag, cfg *config.Config) (gitlab.ProtectedTag, bool) {
+	sample := cfg.Tag(semver.Version{Major: 9, Minor: 9, Patch: 9})
+	var best gitlab.ProtectedTag
+	found := false
+	for _, t := range tags {
+		if !tagRuleMatches(t.Name, sample) {
+			continue
+		}
+		// The most restrictive matching rule is the one that will bite.
+		if !found || t.LowestCreateLevel() > best.LowestCreateLevel() {
+			best, found = t, true
+		}
+	}
+	return best, found
+}
+
+func tagRuleMatches(pattern, tag string) bool {
+	prefix, suffix, isWildcard := strings.Cut(pattern, "*")
+	if !isWildcard {
+		return pattern == tag
+	}
+	return strings.HasPrefix(tag, prefix) && strings.HasSuffix(tag, suffix)
+}
+
+func firstNonEmptyStr(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func presence(ok bool) string {

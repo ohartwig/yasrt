@@ -204,3 +204,45 @@ func TestContextCancellation(t *testing.T) {
 		t.Fatal("expected the cancelled context to surface")
 	}
 }
+
+func TestProtectedBranchAndTagReads(t *testing.T) {
+	c, _ := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/protected_branches"):
+			io.WriteString(w, `[{"name":"main","merge_access_levels":[{"access_level":40}],"push_access_levels":[{"access_level":40}]}]`)
+		case strings.HasSuffix(r.URL.Path, "/protected_tags"):
+			io.WriteString(w, `[{"name":"v*","create_access_levels":[{"access_level":40}]},{"name":"*","create_access_levels":[{"access_level":30}]}]`)
+		}
+	})
+
+	bs, err := c.ListProtectedBranches(context.Background())
+	if err != nil || len(bs) != 1 {
+		t.Fatalf("bs=%+v err=%v", bs, err)
+	}
+	b := bs[0]
+	if got := b.LowestMergeLevel(); got != gitlab.AccessMaintainer {
+		t.Errorf("merge level = %v", got)
+	}
+	if got := b.LowestMergeLevel().String(); got != "Maintainer" {
+		t.Errorf("name = %q", got)
+	}
+
+	tags, err := c.ListProtectedTags(context.Background())
+	if err != nil || len(tags) != 2 {
+		t.Fatalf("tags=%+v err=%v", tags, err)
+	}
+	if got := tags[1].LowestCreateLevel(); got != gitlab.AccessDeveloper {
+		t.Errorf("create level = %v", got)
+	}
+}
+
+func TestAccessLevelNames(t *testing.T) {
+	for lvl, want := range map[gitlab.AccessLevel]string{
+		gitlab.AccessNoOne: "no one", gitlab.AccessDeveloper: "Developer",
+		gitlab.AccessMaintainer: "Maintainer", gitlab.AccessOwner: "Owner",
+	} {
+		if got := lvl.String(); got != want {
+			t.Errorf("%d = %q, want %q", int(lvl), got, want)
+		}
+	}
+}

@@ -5,6 +5,7 @@ package release_test
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json/v2"
 	"errors"
 	"io"
@@ -12,6 +13,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -552,5 +555,136 @@ release_commit:
 	}
 	if got := s.tr.Git("config", "user.name"); got != "release-bot" {
 		t.Errorf("user.name = %q", got)
+	}
+}
+
+// Signing was previously only tested by its refusal path: `required` with no
+// key. That proved nothing about whether a key that IS present actually
+// produces a verifiable signature. These tests generate real key material and
+// verify the resulting objects with git itself.
+func TestSigningProducesVerifiableSignatures(t *testing.T) {
+	t.Run("ssh", func(t *testing.T) {
+		if _, err := exec.LookPath("ssh-keygen"); err != nil {
+			t.Skip("ssh-keygen not available")
+		}
+		keyDir := t.TempDir()
+		priv := filepath.Join(keyDir, "id_ed25519")
+		out, err := exec.Command("ssh-keygen", "-t", "ed25519", "-N", "", "-C", "release-bot", "-f", priv).CombinedOutput()
+		if err != nil {
+			t.Fatalf("ssh-keygen: %v\n%s", err, out)
+		}
+		privPEM, err := os.ReadFile(priv)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pub, err := os.ReadFile(priv + ".pub")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		s := setup(t, "product: image\nrelease_commit:\n  sign: required\n")
+		o := s.opts()
+		o.GPGKeyB64 = base64.StdEncoding.EncodeToString(privPEM)
+
+		rep := run(t, o)
+		if !rep.Signed {
+			t.Fatal("the report should record that this release was signed")
+		}
+
+		// Verify with git, against an allowed-signers file — the same
+		// mechanism .gitsigners uses for human commits in this estate.
+		allowed := filepath.Join(keyDir, "allowed_signers")
+		if err := os.WriteFile(allowed, []byte("release-bot "+string(pub)), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		s.tr.Git("config", "gpg.ssh.allowedSignersFile", allowed)
+
+		if out := s.tr.Git("verify-tag", "--raw", "1.1.0"); !strings.Contains(out, "GOODSIG") &&
+			!strings.Contains(out, "Good \"git\" signature") {
+			// git reports SSH verification on stderr in a different shape
+			// across versions; accept either, but it must not be a failure.
+			t.Logf("verify-tag output: %s", out)
+		}
+		if out, err := s.tr.TryGit("verify-tag", "1.1.0"); err != nil {
+			t.Errorf("the tag signature does not verify: %v\n%s", err, out)
+		}
+		if out, err := s.tr.TryGit("verify-commit", "HEAD"); err != nil {
+			t.Errorf("the release commit signature does not verify: %v\n%s", err, out)
+		}
+	})
+
+	t.Run("openpgp", func(t *testing.T) {
+		if _, err := exec.LookPath("gpg"); err != nil {
+			t.Skip("gpg not available")
+		}
+		// A throwaway keyring, so nothing touches the developer's own. Not
+		// t.TempDir(): that path embeds the test name, and gpg-agent's unix
+		// socket lives inside GNUPGHOME with roughly a 104-character limit.
+		home, err := os.MkdirTemp("", "gnupg")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			_ = exec.Command("gpgconf", "--homedir", home, "--kill", "all").Run()
+			_ = os.RemoveAll(home)
+		})
+		if err := os.Chmod(home, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("GNUPGHOME", home)
+		gen := exec.Command("gpg", "--batch", "--yes", "--passphrase", "",
+			"--quick-generate-key", "Release Bot <release-bot@example.invalid>", "ed25519", "sign", "0")
+		if out, err := gen.CombinedOutput(); err != nil {
+			t.Skipf("cannot generate a test key here: %v\n%s", err, out)
+		}
+		armour, err := exec.Command("gpg", "--batch", "--armor", "--export-secret-keys").Output()
+		if err != nil || len(armour) == 0 {
+			t.Skipf("cannot export the test key: %v", err)
+		}
+
+		s := setup(t, "product: image\nrelease_commit:\n  sign: required\n")
+		o := s.opts()
+		o.GPGKeyB64 = base64.StdEncoding.EncodeToString(armour)
+
+		rep := run(t, o)
+		if !rep.Signed {
+			t.Fatal("the report should record that this release was signed")
+		}
+		if out, err := s.tr.TryGit("verify-tag", "1.1.0"); err != nil {
+			t.Errorf("the tag signature does not verify: %v\n%s", err, out)
+		}
+		if out, err := s.tr.TryGit("verify-commit", "HEAD"); err != nil {
+			t.Errorf("the release commit signature does not verify: %v\n%s", err, out)
+		}
+	})
+}
+
+// sign: required must fail on unusable material, not silently continue.
+func TestSignRequiredRejectsGarbageKey(t *testing.T) {
+	s := setup(t, "product: image\nrelease_commit:\n  sign: required\n")
+	o := s.opts()
+	o.GPGKeyB64 = base64.StdEncoding.EncodeToString([]byte("this is not a key"))
+
+	_, err := release.Run(context.Background(), o)
+	if !errors.Is(err, release.ErrSigningRequired) {
+		t.Fatalf("err = %v", err)
+	}
+	if tags := s.tr.RemoteTags(); slices.Contains(tags, "1.1.0") {
+		t.Error("nothing may be pushed when required signing cannot be satisfied")
+	}
+}
+
+// sign: auto with an unusable key releases unsigned rather than failing.
+func TestSignAutoToleratesGarbageKey(t *testing.T) {
+	s := setup(t, "product: image\nrelease_commit:\n  sign: auto\n")
+	o := s.opts()
+	o.GPGKeyB64 = base64.StdEncoding.EncodeToString([]byte("this is not a key"))
+
+	rep := run(t, o)
+	if rep.Signed {
+		t.Error("an unusable key cannot produce a signature")
+	}
+	if tags := s.tr.RemoteTags(); !slices.Contains(tags, "1.1.0") {
+		t.Errorf("the release should still happen: %q", tags)
 	}
 }

@@ -238,3 +238,89 @@ func (c *Client) attempt(ctx context.Context, method, path string, body, out any
 	}
 	return json.Unmarshal(raw, out)
 }
+
+// AccessLevel is GitLab's numeric permission scale. Only the values that
+// matter for deciding who may release are named.
+type AccessLevel int
+
+const (
+	AccessNoOne      AccessLevel = 0
+	AccessDeveloper  AccessLevel = 30
+	AccessMaintainer AccessLevel = 40
+	AccessOwner      AccessLevel = 50
+)
+
+func (a AccessLevel) String() string {
+	switch {
+	case a >= AccessOwner:
+		return "Owner"
+	case a >= AccessMaintainer:
+		return "Maintainer"
+	case a >= AccessDeveloper:
+		return "Developer"
+	case a <= AccessNoOne:
+		return "no one"
+	}
+	return fmt.Sprintf("level %d", int(a))
+}
+
+type accessEntry struct {
+	AccessLevel int `json:"access_level"`
+}
+
+// ProtectedBranch is the subset of a branch protection rule yasrt reads.
+type ProtectedBranch struct {
+	Name              string        `json:"name"`
+	MergeAccessLevels []accessEntry `json:"merge_access_levels"`
+	PushAccessLevels  []accessEntry `json:"push_access_levels"`
+}
+
+// LowestMergeLevel is the least privileged role that may merge into the branch.
+func (b *ProtectedBranch) LowestMergeLevel() AccessLevel { return lowest(b.MergeAccessLevels) }
+
+// ProtectedTag is the subset of a protected-tag rule yasrt reads.
+type ProtectedTag struct {
+	Name               string        `json:"name"`
+	CreateAccessLevels []accessEntry `json:"create_access_levels"`
+}
+
+// LowestCreateLevel is the least privileged role that may create such a tag.
+func (t *ProtectedTag) LowestCreateLevel() AccessLevel { return lowest(t.CreateAccessLevels) }
+
+func lowest(entries []accessEntry) AccessLevel {
+	if len(entries) == 0 {
+		return AccessNoOne
+	}
+	min := entries[0].AccessLevel
+	for _, e := range entries[1:] {
+		if e.AccessLevel < min {
+			min = e.AccessLevel
+		}
+	}
+	return AccessLevel(min)
+}
+
+// ListProtectedBranches reads every branch protection rule.
+//
+// Deliberately a list rather than a lookup of one branch: GitLab answers 404
+// for an unauthorised read just as it does for a branch that carries no
+// protection, so a per-branch GET cannot tell "not protected" from "not
+// allowed to look". Listing makes the difference explicit — an error is an
+// error, and an empty list really is an unprotected repository. A safety check
+// must not fail open.
+func (c *Client) ListProtectedBranches(ctx context.Context) ([]ProtectedBranch, error) {
+	var out []ProtectedBranch
+	if err := c.do(ctx, http.MethodGet, c.projectPath("protected_branches"), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListProtectedTags reads every protected-tag rule.
+func (c *Client) ListProtectedTags(ctx context.Context) ([]ProtectedTag, error) {
+	var out []ProtectedTag
+	if err := c.do(ctx, http.MethodGet, c.projectPath("protected_tags"), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}

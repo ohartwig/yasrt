@@ -152,7 +152,7 @@ release_commit:            # F6
   message: "chore(release): ${version}"
   assets: [CHANGELOG.md]
   sign: auto               # auto | required | off  (auto: sign if a key is present)
-  author: "release-bot <release-bot@example.invalid>"
+  author: "KOH Release Bot <release-bot@ole-hartwig.eu>"   # default; overridable
 
 gitlab_release:            # F7
   enabled: true
@@ -163,7 +163,13 @@ after_release:             # F9 – non-fatal
   triggers:
     - project: "devops/renovate-runner"
       ref: main
-      variables: { FAST_LANE: "true", SOURCE_PROJECT: "${CI_PROJECT_PATH}" }
+      # The names are the estate's existing contract, not an invention: the npm
+      # component posts exactly these two, and RELEASED_VERSION carries the tag
+      # rather than the bare version. With a v-prefixed tag_format the two
+      # differ, which is what ${tag} is for.
+      variables:
+        RELEASED_PACKAGE: "${CI_PROJECT_PATH}"
+        RELEASED_VERSION: "${tag}"
 ```
 
 ### 5.2 Hooks (extension points)
@@ -288,11 +294,19 @@ Consequence for `rules:`: GitLab evaluates `rules` at pipeline creation, **befor
 | Git push (tag, release commit) | `https://gitlab-ci-token:${CI_JOB_TOKEN}@…` | project setting **Allow Git push requests to the repository** (GitLab ≥ 18.4); the triggering user may push to the default branch and protected tags |
 | Create release | Releases API, header `JOB-TOKEN` | — |
 | Follow-up trigger | Pipeline Trigger API, header `JOB-TOKEN` | target project has the source project/group on its job token allowlist |
-| Commit signature | `GPG_SEM_REL_B64` (optional) | the only remaining long-lived secret; `sign: auto` degrades to unsigned without a key |
+| Commit and tag signature | `GPG_SEM_REL_B64` (optional), **OpenPGP or OpenSSH** | the only remaining long-lived secret; `sign: auto` degrades to unsigned without a key. The format is detected from the key material, not configured |
 
 **No** PATs, project or group access tokens. `yasrt check` verifies the push setting by test-pushing a dummy ref (`refs/yasrt/check`, deleted immediately) and reports missing permissions before the first real release.
 
-**Signature roadmap:** SSH signing with a short-lived key fetched from Vault via OIDC; GitLab shows SSH signatures as verified. Sigstore commit signatures are not verified by GitLab and are therefore not a target.
+**Signing formats.** The variable may hold either an armoured OpenPGP private key or an OpenSSH private key, base64-encoded (raw armour is accepted too). yasrt detects which from the material: an OpenSSH key sets `gpg.format=ssh` and points `user.signingkey` at a 0600 file that is removed when the run ends; an OpenPGP key is imported into the job's keyring. Both paths are covered by tests that generate real keys and verify the resulting objects with `git verify-tag` and `git verify-commit`.
+
+SSH is the format with a future here: GitLab verifies SSH signatures, and the estate already trusts SSH keys for human commits through `.gitsigners`. The roadmap remains a short-lived key from Vault via OIDC. Sigstore commit signatures are not verified by GitLab and are therefore not a target.
+
+**Who may release — the authority invariant.** A `CI_JOB_TOKEN` push acts as *the user who triggered the pipeline*, and on the default branch that is whoever merged. The tag push therefore succeeds exactly when:
+
+> the weakest role allowed to **merge into the default branch** is also allowed to **create tags matching `tag_format`**.
+
+Nothing needs weakening if merging is already Maintainer-only: a Maintainer-only protected tag is then consistent. The failure case is a repository where Developers may merge but not tag — every release they trigger dies at the tag push. `yasrt check` compares the two levels and reports the mismatch as fatal, per repository, before the first release depends on it. It fails closed: GitLab answers 404 for an unauthorised read exactly as it does for an unprotected branch, so being unable to look is reported as such and never as "unprotected".
 
 **Note:** the push setting changes the behaviour of npm `semantic-release` in repos that still use it (it then authenticates with the job token and release pipelines stop running). Migrate **per repo**: enable the setting only once the repo has moved to YASRT.
 

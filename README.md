@@ -157,6 +157,29 @@ produces is a tag, a commit, a GitLab release and a job artefact. Disable the
 project setting **Allow Git push requests to the repository** afterwards if
 nothing else needs it.
 
+## Signing
+
+`release_commit.sign` takes `auto` (sign when a key is present), `required`
+(fail before anything is written if it is not) or `off`. The key comes from
+`GPG_SEM_REL_B64` and may be **either an OpenPGP or an OpenSSH private key**,
+base64-encoded — yasrt detects which from the material rather than asking you to
+declare it. An SSH key is written to a 0600 file for the duration of the run and
+removed afterwards; GitLab verifies SSH signatures, and this estate already
+trusts SSH keys for human commits through `.gitsigners`.
+
+Both paths are tested by generating real keys and verifying the resulting tag
+and commit with `git verify-tag` / `git verify-commit`, rather than by asserting
+that yasrt called git with the right flag.
+
+## Who may release
+
+A `CI_JOB_TOKEN` push acts as the user who triggered the pipeline — on the
+default branch, whoever merged. So the tag push succeeds exactly when the
+weakest role allowed to merge is also allowed to create the release tag. If
+merging is Maintainer-only, a Maintainer-only protected tag is consistent and
+nothing needs loosening. `yasrt check` compares the two and reports a mismatch
+as fatal before the first release depends on it.
+
 ## Security
 
 The only required credential is `CI_JOB_TOKEN`, taken from the job environment.

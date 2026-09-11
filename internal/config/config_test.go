@@ -196,13 +196,6 @@ func TestTagRoundTrip(t *testing.T) {
 	}
 }
 
-func TestExpand(t *testing.T) {
-	v := semver.Version{Major: 3, Minor: 4, Patch: 0}
-	if got := Expand("chore(release): ${version}", v); got != "chore(release): 3.4.0" {
-		t.Errorf("got %q", got)
-	}
-}
-
 func TestFullSpecExample(t *testing.T) {
 	// The example from SPEC §5 must load cleanly, or the specification is lying.
 	c := load(t, `
@@ -248,5 +241,35 @@ after_release:
 `)
 	if c.AfterRelease.Triggers[0].Variables["FAST_LANE"] != "true" {
 		t.Errorf("triggers = %+v", c.AfterRelease.Triggers)
+	}
+}
+
+// ${tag} and ${version} differ wherever tag_format carries a prefix, and the
+// estate's renovate trigger sends the tag. Expanding only ${version} made that
+// contract inexpressible.
+func TestExpandVersionAndTag(t *testing.T) {
+	v := semver.Version{Major: 2, Minor: 5, Patch: 1}
+	for _, tc := range []struct{ tmpl, tag, want string }{
+		{"chore(release): ${version}", "v2.5.1", "chore(release): 2.5.1"},
+		{"${tag}", "v2.5.1", "v2.5.1"},
+		{"${version} == ${tag}", "2.5.1", "2.5.1 == 2.5.1"},
+		{"release ${version} (tag ${tag})", "v2.5.1", "release 2.5.1 (tag v2.5.1)"},
+		{"nothing to expand", "v2.5.1", "nothing to expand"},
+	} {
+		if got := Expand(tc.tmpl, v, tc.tag); got != tc.want {
+			t.Errorf("Expand(%q, tag=%q) = %q, want %q", tc.tmpl, tc.tag, got, tc.want)
+		}
+	}
+}
+
+// A release commit is made by automation; defaulting to the person who merged
+// attributes a bot's work to a human.
+func TestReleaseAuthorDefaultsToTheBotAndStaysOverridable(t *testing.T) {
+	if got := load(t, "product: image\n").ReleaseCommit.Author; got != DefaultReleaseAuthor {
+		t.Errorf("author = %q, want %q", got, DefaultReleaseAuthor)
+	}
+	c := load(t, "product: image\nrelease_commit:\n  author: \"Someone Else <s@example.invalid>\"\n")
+	if got := c.ReleaseCommit.Author; got != "Someone Else <s@example.invalid>" {
+		t.Errorf("author = %q — it must stay configurable", got)
 	}
 }

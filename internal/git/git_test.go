@@ -21,6 +21,17 @@ func open(t *testing.T, dir string) *git.Repo {
 	return r
 }
 
+// mustRun is a diagnostic helper: it never fails the test, it only produces
+// context for one that already has.
+func mustRun(t *testing.T, r *git.Repo, args ...string) string {
+	t.Helper()
+	out, err := r.Run(args...)
+	if err != nil {
+		return "(diagnostic command failed: " + err.Error() + ")"
+	}
+	return out
+}
+
 func TestOpenRejectsNonRepo(t *testing.T) {
 	if _, err := git.Open(t.TempDir()); err == nil {
 		t.Fatal("expected an error outside a work tree")
@@ -38,7 +49,11 @@ func TestLogParsesMultilineMessages(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(commits) != 2 {
-		t.Fatalf("got %d commits", len(commits))
+		// This assertion has failed twice in full-suite runs and never in
+		// isolation or under -race; dump everything so the next occurrence
+		// explains itself instead of needing a re-run to reproduce.
+		t.Fatalf("got %d commits, want 2: %#v\nraw log:\n%s",
+			len(commits), commits, mustRun(t, r, "log", "--format=%H %h %an <%ae>%n%B%n--"))
 	}
 	// Newest first.
 	if !strings.HasPrefix(commits[0].Message, "fix(scope): second") {

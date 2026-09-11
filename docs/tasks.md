@@ -342,6 +342,23 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
       built commits, changelog with compare link, Assets list in the body, trigger reported as
       undeliverable, no workflow re-triggered by the `GITHUB_TOKEN` push. Forgejo still to run.
 
+## P13 — Estate-wide shadow (2026-09-11) and cut-over (planned 2026-09-14)
+
+- [x] **T-170** `yasrt-shadow@1` in all eight releasing flavours of `composed-default-pipelines`
+      (2.4.0): 79 consumers compare on every protected push without a change of their own.
+- [x] **T-171** `yasrt-shadow@1` added directly to the 23 remaining semantic-release consumers;
+      22 merged, `devops/wolfi-packages` blocked by its own `check:secdb-floor` (syft r4 < r5).
+- [x] **T-172** Two defects in the comparison itself, found by the first real releases:
+      `git tag --points-at HEAD` missed the tag on semantic-release's release commit (1.20.2), and
+      `needs:` put `shadow:compare` into the DAG so it ran before `release:semver` (1.20.3).
+- [x] **T-173** `scripts/shadow-report.py` collects every verdict on the instance into one table.
+- [ ] **T-174** `devops/images/yasrt` inbound job-token allowlist: every top-level group, as
+      `devops/images/node` has. Without it the shadow fails on runners that pull with the
+      consumer's job token. *Needs a Maintainer of the project.*
+- [ ] **T-175** Read the verdicts on 2026-09-13; every DIFFER explained or fixed before cut-over.
+- [ ] **T-176** Cut-over: swap `semantic-release@1` for `yasrt@1` in the eight composed flavours
+      and the direct consumers, enable the push setting per repository, remove the shadow.
+
 ## P12 — semantic-release parity
 
 - [x] **T-160** `hooks.on_failure` (≈ `failCmd`): runs when `release` is about to exit non-zero,

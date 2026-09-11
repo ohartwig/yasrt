@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.1](https://git.ole-hartwig.eu/yasrt/cli/compare/1.5.0...1.5.1) (2026-09-11)
+
+### :bug: Fixes
+
+* put the release commit on the branch that was built ([346533d](https://git.ole-hartwig.eu/yasrt/cli/commit/346533d64614b9dc599bc291d06385d5338e029e))
+
 ## [1.5.0] - 2026-09-11
 
 ### :sparkles: Features

@@ -15,7 +15,9 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 
+	"git.ole-hartwig.eu/yasrt/cli/internal/hooks"
 	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
 	yaml "go.yaml.in/yaml/v3"
 )
@@ -51,6 +53,31 @@ type Config struct {
 	ReleaseCommit  ReleaseCommit  `yaml:"release_commit"`
 	GitLabRelease  GitLabRelease  `yaml:"gitlab_release"`
 	AfterRelease   AfterRelease   `yaml:"after_release"`
+	Hooks          Hooks          `yaml:"hooks"`
+}
+
+// Hooks are yasrt's extension mechanism: external programs run at defined
+// points. See internal/hooks for why they are out-of-process.
+type Hooks struct {
+	AfterAnalysis []hooks.Hook `yaml:"after_analysis"`
+	BeforeTag     []hooks.Hook `yaml:"before_tag"`
+	AfterTag      []hooks.Hook `yaml:"after_tag"`
+	AfterRelease  []hooks.Hook `yaml:"after_release"`
+}
+
+// For returns the hooks configured for one event.
+func (h Hooks) For(e hooks.Event) []hooks.Hook {
+	switch e {
+	case hooks.AfterAnalysis:
+		return h.AfterAnalysis
+	case hooks.BeforeTag:
+		return h.BeforeTag
+	case hooks.AfterTag:
+		return h.AfterTag
+	case hooks.AfterRelease:
+		return h.AfterRelease
+	}
+	return nil
 }
 
 type Versioning struct {
@@ -313,6 +340,18 @@ func (c *Config) validate() error {
 	case SignAuto, SignRequired, SignOff:
 	default:
 		errs = append(errs, fmt.Errorf("release_commit.sign: %q is not auto, required or off", c.ReleaseCommit.Sign))
+	}
+	for _, e := range hooks.Events() {
+		for i, h := range c.Hooks.For(e) {
+			if strings.TrimSpace(h.Run) == "" {
+				errs = append(errs, fmt.Errorf("hooks.%s[%d].run: required", e, i))
+			}
+			if h.Timeout != "" {
+				if _, err := time.ParseDuration(h.Timeout); err != nil {
+					errs = append(errs, fmt.Errorf("hooks.%s[%d].timeout: %q is not a duration such as \"90s\"", e, i, h.Timeout))
+				}
+			}
+		}
 	}
 	for i, t := range c.AfterRelease.Triggers {
 		if t.Project == "" {

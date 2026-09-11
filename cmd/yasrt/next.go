@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"git.ole-hartwig.eu/yasrt/cli/internal/analyze"
 	"git.ole-hartwig.eu/yasrt/cli/internal/config"
 	"git.ole-hartwig.eu/yasrt/cli/internal/git"
+	"git.ole-hartwig.eu/yasrt/cli/internal/hooks"
 	"git.ole-hartwig.eu/yasrt/cli/internal/output"
 	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
 )
@@ -90,6 +92,25 @@ func cmdNext(args []string) error {
 			return err
 		}
 		log.Info("result written", "path", outPath, "status", string(res.Status))
+	}
+
+	// after_analysis hooks observe the decision; they cannot change it. `next`
+	// stays read-only, and a hook that could rewrite the answer would make the
+	// handshake with the build job meaningless.
+	if hs := cfg.Hooks.For(hooks.AfterAnalysis); len(hs) > 0 {
+		hctx := hooks.Context{
+			Status:   string(res.Status),
+			Version:  res.Version.String(),
+			Tag:      res.Tag,
+			Previous: res.Previous,
+			Bump:     res.Bump.String(),
+			Reason:   res.Reason,
+			Commit:   res.Commit,
+			Breaking: res.Decision.Breaking(),
+		}
+		if _, err := hooks.Run(context.Background(), repo.Dir(), hooks.AfterAnalysis, hs, hctx, log); err != nil {
+			return err
+		}
 	}
 
 	if common.json {

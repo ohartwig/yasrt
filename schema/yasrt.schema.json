@@ -4,14 +4,27 @@
   "title": ".yasrt.yaml",
   "description": "Configuration for yasrt. Every field is optional except product.",
   "type": "object",
-  "required": ["product"],
+  "required": [
+    "product"
+  ],
   "additionalProperties": false,
   "properties": {
-    "version": { "type": "integer", "enum": [1], "default": 1 },
+    "version": {
+      "type": "integer",
+      "enum": [
+        1
+      ],
+      "default": 1
+    },
     "product": {
       "description": "What this repository ships. Derives non_release_paths and tag_format.",
       "type": "string",
-      "enum": ["image", "package", "extension", "custom"]
+      "enum": [
+        "image",
+        "package",
+        "extension",
+        "custom"
+      ]
     },
     "tag_format": {
       "description": "Tag template. Defaults to ${version} for image and custom, v${version} for package and extension.",
@@ -42,15 +55,42 @@
         "type": "object",
         "additionalProperties": false,
         "anyOf": [
-          { "required": ["type"] },
-          { "required": ["scope"] },
-          { "required": ["breaking"] }
+          {
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "required": [
+              "scope"
+            ]
+          },
+          {
+            "required": [
+              "breaking"
+            ]
+          }
         ],
         "properties": {
-          "type": { "type": "string" },
-          "scope": { "type": "string" },
-          "breaking": { "type": "boolean" },
-          "release": { "type": "string", "enum": ["major", "minor", "patch", "none", ""] }
+          "type": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "breaking": {
+            "type": "boolean"
+          },
+          "release": {
+            "type": "string",
+            "enum": [
+              "major",
+              "minor",
+              "patch",
+              "none",
+              ""
+            ]
+          }
         }
       }
     },
@@ -61,17 +101,23 @@
         "scopes": {
           "description": "Commit scopes that never release. `release` is always present and cannot be removed.",
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "authors": {
           "description": "Matches the author name, the full address, or the local part of the address.",
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "trailers": {
           "description": "Markers such as [skip release] in the body, or a matching footer token.",
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -82,12 +128,16 @@
         "non_release_paths": {
           "description": "Replaces the list derived from product entirely. Required when product is custom.",
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "extra_non_release_paths": {
           "description": "Extends whichever list applies.",
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -95,17 +145,27 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "file": { "type": "string", "default": "CHANGELOG.md" },
+        "file": {
+          "type": "string",
+          "default": "CHANGELOG.md"
+        },
         "sections": {
           "description": "Rendered in this order; empty sections are omitted.",
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["type", "title"],
+            "required": [
+              "type",
+              "title"
+            ],
             "additionalProperties": false,
             "properties": {
-              "type": { "type": "string" },
-              "title": { "type": "string" }
+              "type": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
             }
           }
         }
@@ -115,34 +175,75 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean", "default": true },
-        "message": { "type": "string", "default": "chore(release): ${version}" },
-        "assets": { "type": "array", "items": { "type": "string" } },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "message": {
+          "type": "string",
+          "default": "chore(release): ${version}"
+        },
+        "assets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "sign": {
           "description": "auto signs when a key is present; required fails before anything is pushed; off never signs.",
           "type": "string",
-          "enum": ["auto", "required", "off"],
+          "enum": [
+            "auto",
+            "required",
+            "off"
+          ],
           "default": "auto"
         },
-        "author": { "type": "string", "examples": ["release-bot <release-bot@example.invalid>"] }
+        "author": {
+          "type": "string",
+          "examples": [
+            "release-bot <release-bot@example.invalid>"
+          ]
+        }
       }
     },
     "gitlab_release": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean", "default": true },
-        "name": { "type": "string", "default": "${version}" },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "name": {
+          "type": "string",
+          "default": "${version}"
+        },
         "assets": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["name", "url"],
+            "required": [
+              "name",
+              "url"
+            ],
             "additionalProperties": false,
             "properties": {
-              "name": { "type": "string" },
-              "url": { "type": "string" },
-              "link_type": { "type": "string", "enum": ["other", "runbook", "image", "package"] }
+              "name": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "link_type": {
+                "type": "string",
+                "enum": [
+                  "other",
+                  "runbook",
+                  "image",
+                  "package"
+                ]
+              }
             }
           }
         }
@@ -157,12 +258,175 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["project", "ref"],
+            "required": [
+              "project",
+              "ref"
+            ],
             "additionalProperties": false,
             "properties": {
-              "project": { "type": "string" },
-              "ref": { "type": "string" },
-              "variables": { "type": "object", "additionalProperties": { "type": "string" } }
+              "project": {
+                "type": "string"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "variables": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "External programs run at defined points. yasrt's extension mechanism; deliberately out of process.",
+      "properties": {
+        "after_analysis": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "run"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "run": {
+                "type": "string",
+                "description": "Executable. Resolved relative to the repository when it starts with ./ or ../, through PATH otherwise."
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Passed verbatim; no shell is involved."
+              },
+              "name": {
+                "type": "string",
+                "description": "Label used in logs and in the release report."
+              },
+              "timeout": {
+                "type": "string",
+                "description": "Go duration such as 90s or 5m. Default 5m.",
+                "pattern": "^[0-9]+(ns|us|ms|s|m|h)$"
+              },
+              "allow_failure": {
+                "type": "boolean",
+                "description": "Overrides the per-event default: fatal for before_tag and after_tag, tolerated for after_analysis and after_release."
+              }
+            }
+          }
+        },
+        "before_tag": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "run"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "run": {
+                "type": "string",
+                "description": "Executable. Resolved relative to the repository when it starts with ./ or ../, through PATH otherwise."
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Passed verbatim; no shell is involved."
+              },
+              "name": {
+                "type": "string",
+                "description": "Label used in logs and in the release report."
+              },
+              "timeout": {
+                "type": "string",
+                "description": "Go duration such as 90s or 5m. Default 5m.",
+                "pattern": "^[0-9]+(ns|us|ms|s|m|h)$"
+              },
+              "allow_failure": {
+                "type": "boolean",
+                "description": "Overrides the per-event default: fatal for before_tag and after_tag, tolerated for after_analysis and after_release."
+              }
+            }
+          }
+        },
+        "after_tag": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "run"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "run": {
+                "type": "string",
+                "description": "Executable. Resolved relative to the repository when it starts with ./ or ../, through PATH otherwise."
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Passed verbatim; no shell is involved."
+              },
+              "name": {
+                "type": "string",
+                "description": "Label used in logs and in the release report."
+              },
+              "timeout": {
+                "type": "string",
+                "description": "Go duration such as 90s or 5m. Default 5m.",
+                "pattern": "^[0-9]+(ns|us|ms|s|m|h)$"
+              },
+              "allow_failure": {
+                "type": "boolean",
+                "description": "Overrides the per-event default: fatal for before_tag and after_tag, tolerated for after_analysis and after_release."
+              }
+            }
+          }
+        },
+        "after_release": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "run"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "run": {
+                "type": "string",
+                "description": "Executable. Resolved relative to the repository when it starts with ./ or ../, through PATH otherwise."
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Passed verbatim; no shell is involved."
+              },
+              "name": {
+                "type": "string",
+                "description": "Label used in logs and in the release report."
+              },
+              "timeout": {
+                "type": "string",
+                "description": "Go duration such as 90s or 5m. Default 5m.",
+                "pattern": "^[0-9]+(ns|us|ms|s|m|h)$"
+              },
+              "allow_failure": {
+                "type": "boolean",
+                "description": "Overrides the per-event default: fatal for before_tag and after_tag, tolerated for after_analysis and after_release."
+              }
             }
           }
         }

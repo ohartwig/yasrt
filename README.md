@@ -16,6 +16,9 @@ publishes the release **after** the artefact has been built. It replaces the npm
 - **One file per repository.** `.yasrt.yaml`, with almost everything derived
   from a single `product:` field.
 - **Three dependencies.** A YAML parser, a glob matcher, and git itself.
+- **Extensible out of process.** Hooks call any executable at defined points and
+  hand it the release context — the extensibility of a plugin system without a
+  package manager in the release path.
 
 ## Purpose
 
@@ -61,6 +64,36 @@ format, matching what this estate already does:
 | `package` | the above **plus** `.gitlab-ci.yml`, `.gitlab/**` | `v1.2.3` |
 | `extension` | as `package` | `v1.2.3` |
 | `custom` | nothing derived; `non_release_paths` is required | `1.2.3` |
+
+### Hooks
+
+Extension points, in the order they run. A hook is any executable; it gets the
+release context as JSON on stdin and as `RELEASE_*` environment variables, and
+signals failure with a non-zero exit code.
+
+```yaml
+hooks:
+  before_tag:
+    - run: ./scripts/policy-check
+      name: policy gate
+      timeout: 90s
+  after_tag:
+    - run: ./scripts/publish-composer.sh
+  after_release:
+    - run: ./scripts/notify.sh
+      allow_failure: true
+```
+
+| event | when | failure |
+|---|---|---|
+| `after_analysis` | in `next`, after the decision | reported |
+| `before_tag` | in `release`, before any write | **aborts**, repository untouched |
+| `after_tag` | tag on the remote, release commit not yet made | **aborts** |
+| `after_release` | last, after the GitLab release and triggers | reported |
+
+`args` are passed verbatim — no shell, so nothing is word-split or
+glob-expanded. `allow_failure` overrides the default either way. Hooks are never
+handed a credential; one that needs a token reads it from its own environment.
 
 Everything else is optional and documented in
 [`schema/yasrt.schema.json`](schema/yasrt.schema.json), which editors pick up

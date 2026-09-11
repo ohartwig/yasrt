@@ -49,6 +49,10 @@ gofmt -l . && go vet ./... && go test ./...
 ## What not to add
 
 The non-goals in [`docs/SPEC.md`](docs/SPEC.md) §2 are decisions, not gaps:
-no monorepo versioning, no plugin system, no forge other than GitLab, no
-publishing to package registries, no CLI framework, and no Conventional Commits
-preset dependency. Prereleases are the one deferred item, planned as phase P10.
+no monorepo versioning, no forge other than GitLab, no publishing to package
+registries from the binary, no CLI framework, and no Conventional Commits preset
+dependency. Prereleases are the one deferred item, planned as phase P10.
+
+Extension goes through **exec hooks** (§5.2), never through a package chain
+resolved at run time — that chain is what this tool was built to remove. If a
+feature can be a hook, it should be a hook.

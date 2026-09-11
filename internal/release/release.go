@@ -27,6 +27,7 @@ import (
 	"git.ole-hartwig.eu/yasrt/cli/internal/config"
 	"git.ole-hartwig.eu/yasrt/cli/internal/git"
 	"git.ole-hartwig.eu/yasrt/cli/internal/gitlab"
+	"git.ole-hartwig.eu/yasrt/cli/internal/hooks"
 	"git.ole-hartwig.eu/yasrt/cli/internal/render"
 )
 
@@ -77,6 +78,7 @@ type Report struct {
 	Signed        bool            `json:"signed"`
 	Steps         []Step          `json:"steps"`
 	Triggers      []TriggerResult `json:"triggers,omitzero"`
+	Hooks         []hooks.Result  `json:"hooks,omitzero"`
 	Notes         string          `json:"notes,omitzero"`
 }
 
@@ -103,6 +105,25 @@ func (o *Options) remote() string {
 		return "origin"
 	}
 	return o.Remote
+}
+
+// hookContext describes the release to an external hook. It deliberately
+// carries no credentials: a hook that needs a token reads it from its own
+// environment rather than being handed one.
+func hookContext(res *analyze.Result, notes, projectURL string, dryRun bool) hooks.Context {
+	return hooks.Context{
+		Status:     string(res.Status),
+		Version:    res.Version.String(),
+		Tag:        res.Tag,
+		Previous:   res.Previous,
+		Bump:       res.Bump.String(),
+		Reason:     res.Reason,
+		Commit:     res.Commit,
+		Notes:      notes,
+		ProjectURL: projectURL,
+		Breaking:   res.Decision.Breaking(),
+		DryRun:     dryRun,
+	}
 }
 
 func (o *Options) now() time.Time {
@@ -187,6 +208,21 @@ func Run(ctx context.Context, o Options) (*Report, error) {
 	rep.Steps = append(rep.Steps, Step{Name: "notes", Status: StepDone})
 	log.Info("release notes rendered", "version", res.Version.String(), "bytes", len(notes))
 
+	hctx := hookContext(res, notes, o.ProjectURL, o.DryRun)
+
+	// before_tag runs while nothing has been written yet, so a hook that says
+	// no leaves the repository exactly as it found it.
+	hres, hookErr := hooks.Run(ctx, repo.Dir(), hooks.BeforeTag, cfg.Hooks.For(hooks.BeforeTag), hctx, log)
+	rep.Hooks = append(rep.Hooks, hres...)
+	if hookErr != nil {
+		rep.Steps = append(rep.Steps, Step{Name: "hook:before_tag", Status: StepFailed, Detail: hookErr.Error()})
+		return rep, hookErr
+	}
+	if len(hres) > 0 {
+		rep.Steps = append(rep.Steps, Step{Name: "hook:before_tag", Status: StepDone,
+			Detail: fmt.Sprintf("%d hook(s)", len(hres))})
+	}
+
 	if o.DryRun {
 		log.Info("dry run: stopping before the first write")
 		rep.Steps = append(rep.Steps, Step{Name: "dry-run", Status: StepSkipped, Detail: "no writes performed"})
@@ -242,6 +278,17 @@ func Run(ctx context.Context, o Options) (*Report, error) {
 		log.Info("tag pushed", "tag", res.Tag, "commit", short(res.Commit))
 	}
 
+	hres, hookErr = hooks.Run(ctx, repo.Dir(), hooks.AfterTag, cfg.Hooks.For(hooks.AfterTag), hctx, log)
+	rep.Hooks = append(rep.Hooks, hres...)
+	if hookErr != nil {
+		rep.Steps = append(rep.Steps, Step{Name: "hook:after_tag", Status: StepFailed, Detail: hookErr.Error()})
+		return rep, hookErr
+	}
+	if len(hres) > 0 {
+		rep.Steps = append(rep.Steps, Step{Name: "hook:after_tag", Status: StepDone,
+			Detail: fmt.Sprintf("%d hook(s)", len(hres))})
+	}
+
 	// Step 4: the release commit, after the tag on purpose.
 	if cfg.ReleaseCommitEnabled() {
 		st, detail, sha, err := commitChangelog(repo, cfg, res, o, sign, changelogStaged, log)
@@ -270,6 +317,22 @@ func Run(ctx context.Context, o Options) (*Report, error) {
 	rep.Triggers = runTriggers(ctx, o, cfg, res, log)
 	rep.Steps = append(rep.Steps, Step{Name: "triggers", Status: StepDone,
 		Detail: fmt.Sprintf("%d configured", len(cfg.AfterRelease.Triggers))})
+
+	// Step 7: after_release hooks. The release has already happened, so a
+	// failure here is reported rather than fatal, unless a hook opts in.
+	hres, hookErr = hooks.Run(ctx, repo.Dir(), hooks.AfterRelease, cfg.Hooks.For(hooks.AfterRelease), hctx, log)
+	rep.Hooks = append(rep.Hooks, hres...)
+	if len(hres) > 0 {
+		st := StepDone
+		if hookErr != nil {
+			st = StepFailed
+		}
+		rep.Steps = append(rep.Steps, Step{Name: "hook:after_release", Status: st,
+			Detail: fmt.Sprintf("%d hook(s)", len(hres))})
+	}
+	if hookErr != nil {
+		return rep, hookErr
+	}
 
 	return rep, nil
 }

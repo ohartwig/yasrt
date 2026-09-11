@@ -24,7 +24,13 @@ GitLab CI/CD component. It
 - Prerelease / maintenance branch models (`next`, `beta`, `1.x`) — **not in the MVP**, but a
   planned later phase. `-rc.N` is live in `gsb11/extensions/*` and `moselwal-packages/*`, so
   prerelease support is the precondition for removing the old component, not a permanent exclusion.
-- Plugin system. Extension happens through configuration or code changes.
+- Plugin system **as a package chain**. semantic-release's plugins are npm
+  packages resolved at run time, which is what produces the 384–516 unpinned
+  transitive dependencies and the ~21 s `npm install` this tool exists to
+  remove. Extension instead happens out of process, through **exec hooks**
+  (§5.2): yasrt calls any executable at defined points and hands it the release
+  context. The binary stays dependency-free and a plugin needs no package
+  manager in the release path.
 - Forges other than GitLab.
 - Publishing to registries (npm, PyPI, OCI). That stays with the build jobs.
 
@@ -159,6 +165,35 @@ after_release:             # F9 – non-fatal
       ref: main
       variables: { FAST_LANE: "true", SOURCE_PROJECT: "${CI_PROJECT_PATH}" }
 ```
+
+### 5.2 Hooks (extension points)
+
+```yaml
+hooks:
+  after_analysis:          # in `next`; observes the decision, cannot change it
+    - run: ./scripts/announce.sh
+  before_tag:              # in `release`, before anything is written
+    - run: ./scripts/policy-check
+      name: policy gate
+      timeout: 90s
+  after_tag:               # tag is on the remote, release commit not yet made
+    - run: ./scripts/publish-composer.sh
+  after_release:           # last; failures are reported, not fatal
+    - run: ./scripts/notify.sh
+      allow_failure: true
+```
+
+A hook is any executable. It receives the release context as JSON on stdin and
+as `RELEASE_*` environment variables, and signals failure with a non-zero exit
+code. `args` are passed verbatim — no shell is involved, so nothing is
+word-split or glob-expanded. Default timeout five minutes.
+
+Failure is fatal for `before_tag` and `after_tag` and non-fatal for
+`after_analysis` and `after_release`; `allow_failure` overrides either way. A
+`before_tag` veto leaves the repository exactly as it was found.
+
+Hooks are never handed a credential. A hook that needs a token reads it from
+its own environment.
 
 ### 5.1 Derivation `product → non_release_paths` (F11)
 

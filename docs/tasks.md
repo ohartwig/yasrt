@@ -250,6 +250,29 @@ those are the boundary of what could be done without touching the estate.
 - [ ] **T-124** Mark the `semantic-release` template deprecated with a pointer to the replacement.
       *Done when:* the deprecation is visible in the template README and the catalogue.
 
+## P11 — Hooks (extension points)
+
+- [x] **T-140** `internal/hooks`: run external executables at `after_analysis`,
+      `before_tag`, `after_tag` and `after_release`, with the release context on stdin as JSON
+      and as `RELEASE_*` environment variables.
+      *Done when:* a hook sees the version, arguments are passed without a shell, and the
+      timeout is enforced.
+- [x] **T-141** Failure semantics: fatal for `before_tag` and `after_tag`, reported for
+      `after_analysis` and `after_release`, `allow_failure` overriding either way.
+      *Done when:* a failing `before_tag` hook leaves the repository untouched — no tag pushed,
+      no changelog written.
+- [x] **T-142** Wire hooks into `next` and `release`, and record every run in
+      `release-report.json`.
+      *Done when:* the report lists each hook with its exit code, duration and output.
+- [x] **T-143** Document hooks in SPEC §5.2, the JSON schema, the README and CONTRIBUTING, and
+      amend the SPEC §2 non-goal.
+      *Done when:* the four documents agree on what a hook is and when it runs.
+- [ ] **T-144** Port the estate's existing release satellites to hooks or leave them as CI jobs:
+      `composer-package-gitlab-release`, `typo3-extension-release`, `packagist-submit`,
+      `cleanup-release-tags`.
+      *Done when:* each is either a documented hook or a documented downstream job, and the
+      choice is recorded.
+
 ## P10 — Prereleases, then decommissioning
 
 - [ ] **T-130** Design prerelease support for the two live shapes: `main` with `prerelease: rc`, and a

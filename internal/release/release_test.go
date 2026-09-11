@@ -466,3 +466,53 @@ func readFile(t *testing.T, p string) []byte {
 	}
 	return b
 }
+
+// Hooks are yasrt's extension mechanism; this proves one actually runs inside a
+// real release, sees the version, and can stop the release before any write.
+func TestHooksRunDuringARelease(t *testing.T) {
+	t.Run("after_tag hook sees the released version", func(t *testing.T) {
+		s := setup(t, `
+product: image
+hooks:
+  after_tag:
+    - run: ./hook.sh
+      name: record
+`)
+		s.tr.Write("hook.sh", "#!/bin/sh\nprintf '%s %s' \"$RELEASE_TAG\" \"$YASRT_EVENT\" > hook-output.txt\n")
+		if err := os.Chmod(s.tr.Dir+"/hook.sh", 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		rep := run(t, s.opts())
+		if got := s.tr.Read("hook-output.txt"); got != "1.1.0 after_tag" {
+			t.Errorf("hook saw %q", got)
+		}
+		if len(rep.Hooks) != 1 || rep.Hooks[0].Name != "record" {
+			t.Errorf("report hooks = %+v", rep.Hooks)
+		}
+	})
+
+	t.Run("a failing before_tag hook leaves the repository untouched", func(t *testing.T) {
+		s := setup(t, `
+product: image
+hooks:
+  before_tag:
+    - run: ./veto.sh
+`)
+		s.tr.Write("veto.sh", "#!/bin/sh\necho 'policy says no' >&2\nexit 1\n")
+		if err := os.Chmod(s.tr.Dir+"/veto.sh", 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		_, err := release.Run(context.Background(), s.opts())
+		if err == nil {
+			t.Fatal("expected the veto to stop the release")
+		}
+		if tags := s.tr.RemoteTags(); slices.Contains(tags, "1.1.0") {
+			t.Error("nothing may be pushed after a before_tag veto")
+		}
+		if s.tr.Exists("CHANGELOG.md") {
+			t.Error("nothing may be written either")
+		}
+	})
+}

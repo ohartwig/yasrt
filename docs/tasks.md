@@ -352,9 +352,21 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
       `git tag --points-at HEAD` missed the tag on semantic-release's release commit (1.20.2), and
       `needs:` put `shadow:compare` into the DAG so it ran before `release:semver` (1.20.3).
 - [x] **T-173** `scripts/shadow-report.py` collects every verdict on the instance into one table.
-- [ ] **T-174** `devops/images/yasrt` inbound job-token allowlist: every top-level group, as
-      `devops/images/node` has. Without it the shadow fails on runners that pull with the
-      consumer's job token. *Needs a Maintainer of the project.*
+- [x] **T-174** `devops/images/yasrt` inbound job-token allowlist: all twelve top-level groups.
+- [x] **T-177** R8 resolved — the image release gate. `buildkit-image-build` 2.4.0 takes
+      `release-tool: yasrt` and runs build, scan, sign, attest, verify and release-check on the
+      default-branch push, reading `RELEASE_STATUS`/`RELEASE_TAG` from `version`; a push that
+      decided against a release leaves every job green with "nothing to do". `release-tools`
+      1.21.0 adds `release-needs` so `release` (in `.post`) waits for the whole chain.
+      `golden-image` (composed 2.5.0) exposes `release-tool`. Pilot `devops/images/yasrt`
+      released **1.4.0** this way on 2026-09-11 21:48: tag on the merge commit, image signed,
+      attested and verified before the tag existed, no tag pipeline, no release-commit pipeline.
+- [ ] **T-178** `container-scanning!300` (empty digest on a no-release push is "nothing to
+      scan") — pipeline green, merge blocked by the review policy; then the pin in
+      `buildkit-image-build` follows via Renovate. Until then a no-bump push to a migrated image
+      repository fails at `container_scanning`.
+- [ ] **T-179** Push setting on the 95 guarded consumers: `scratchpad/enable-push-setting.sh`,
+      needs a Maintainer. The pilot got it by hand.
 - [ ] **T-175** Read the verdicts on 2026-09-13; every DIFFER explained or fixed before cut-over.
 - [ ] **T-176** Cut-over: swap `semantic-release@1` for `yasrt@1` in the eight composed flavours
       and the direct consumers, enable the push setting per repository, remove the shadow.

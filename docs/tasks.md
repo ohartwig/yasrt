@@ -20,8 +20,17 @@ review is done.**
   - `release-tools!204` — the three publish templates survive the migration
   - `gitlab-profile!482` — the handbook transition, DCS-26, I-081
 
-**The pilot (P8) is blocked on !203**, not on work: the component version `@1`
-does not exist until it merges, and component changes need two reviewers.
+**Merged and released**: `release-tools` 1.18.0 (the templates), 1.18.1 (the
+publish templates surviving migration), 1.18.2 (the entrypoint fix the pilot
+found). `gitlab-profile!482` was merged by `koh-review-agent` on auto-merge.
+
+**The pilot ran on `yasrt/cli` itself** and is recorded in `plan.md` §6a.
+
+**Still blocked, and it is a design decision rather than work:** image
+repositories cannot migrate until `buildkit-image-build` can gate a build on the
+release handshake instead of `$CI_COMMIT_TAG`. Skipping the build alone is not
+enough — `sign:image`, `attest:sbom` and `container_scanning` all consume the
+digest it produces. Two candidate designs are in `plan.md` risk R8.
 
 ---
 

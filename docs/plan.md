@@ -295,6 +295,34 @@ item in P8 and P9.
 adding them to `composed-default-pipelines/go` would affect the two other Go consumers. Start local to
 YASRT; propose promotion afterwards.
 
+## 6a. What the pilot found
+
+`yasrt/cli` was migrated to `release-tools/yasrt@1` first, deliberately: a
+repository we own, where a broken release costs nothing. It found four defects,
+none of which a linter could have found, and each of which would have surfaced
+as a red release pipeline in somebody else's repository:
+
+1. **`unknown command "sh"`.** `devops/images/yasrt` sets `ENTRYPOINT` to the
+   binary so it works as a CLI; GitLab starts a job by invoking the entrypoint
+   with a shell command. The template now overrides `entrypoint: [""]`, which is
+   what `lint-ci-yaml` already does for its own tool image. The template was
+   valid YAML and valid CI configuration throughout — it had simply never run.
+2. **The package endpoint answers 302 to S3.** `curl` without `--location`
+   writes the redirect body into the output file and exits 0. The binary in the
+   image build was a 168-byte HTML fragment.
+3. **Wolfi's `gnupg` and `openssh-client` are meta-packages** with no binaries.
+   Packages are now selected by the command they provide (`cmd:gpg`).
+4. **A base digest copied from a sibling image was stale enough to break**:
+   current `sqlite-libs` against its glibc, which only surfaced once gpg was
+   actually installed and run.
+
+Plus one that is about the process rather than the product: **a semgrep
+suppression that does not suppress looks exactly like one that does.** The rule
+fired on the constant yasrt uses to *recognise* PGP keys. Two attempts were
+wrong because I guessed at semgrep's matching rules instead of reading them —
+placement first, then rule-scoping. The tell was the third attempt at a
+two-line problem.
+
 ## 7. Verification
 
 - `go test ./...` green, `-race` on the unit suite, coverage reported through the `coverage:` regex.

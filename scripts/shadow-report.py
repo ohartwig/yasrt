@@ -45,6 +45,10 @@ def verdicts(p, since):
         m = VERDICT.search(text)
         sr = re.search(r"^semantic-release:\s*(\S.*)$", text, re.M)
         ya = re.search(r"^yasrt:\s*(\S.*)$", text, re.M)
+        if not ya and not m:
+            # Another tool's job of the same name (pinup/runner has one), or a
+            # job that died before it could say anything -- not a verdict.
+            continue
         out.append({
             "project": p["path_with_namespace"], "pipeline": j["pipeline"]["id"], "ref": j["ref"],
             "created_at": j["created_at"], "web_url": j["web_url"],

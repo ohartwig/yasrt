@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -336,5 +337,59 @@ hooks:
 	run(t, s.opts())
 	if s.tr.Exists("failure.txt") {
 		t.Error("on_failure ran on a successful release")
+	}
+}
+
+// Renovate merges several times an hour; by the time release runs, the
+// branch has often moved on. The tag is already published then, so the
+// release commit is rebuilt on the branch's new head rather than refused.
+func TestReleaseCommitFollowsAMovedBranch(t *testing.T) {
+	s := setup(t, "product: image\n")
+	analysed := s.res.Commit
+
+	// Somebody else pushes to main between analysis and release.
+	other := s.tr.CloneRemote()
+	other.CommitFile("src/other.go", "x", "chore: unrelated bump")
+	other.Git("push", "-q", "origin", "HEAD:main")
+
+	rep := run(t, s.opts())
+
+	if got := stepStatus(rep, "release-commit"); got != release.StepDone {
+		t.Fatalf("release-commit = %q, want done", got)
+	}
+	// The tag still names what was built, not the moved branch.
+	if got := s.tr.Git("rev-parse", "1.1.0^{commit}"); got != analysed {
+		t.Errorf("tag points at %s, want %s", got, analysed)
+	}
+	// The release commit sits on top of the other push and carries the changelog.
+	head := s.tr.Git("ls-remote", "origin", "refs/heads/main")
+	if !strings.HasPrefix(head, rep.ReleaseCommit) {
+		t.Errorf("remote main = %s, want the release commit %s", head[:12], rep.ReleaseCommit[:12])
+	}
+	parent := s.tr.Git("rev-parse", rep.ReleaseCommit+"^")
+	otherHead := other.Git("rev-parse", "HEAD")
+	if parent != otherHead {
+		t.Errorf("release commit parent = %s, want the other push %s", parent[:12], otherHead[:12])
+	}
+	if cl := s.tr.Git("show", rep.ReleaseCommit+":CHANGELOG.md"); !strings.Contains(cl, "## [1.1.0]") {
+		t.Errorf("changelog on the rebuilt commit:\n%s", cl)
+	}
+}
+
+// A branch that no longer contains the released commit was rewritten; the
+// changelog is not quietly rebuilt on top of that.
+func TestReleaseCommitRefusesARewrittenBranch(t *testing.T) {
+	s := setup(t, "product: image\n")
+	other := s.tr.CloneRemote()
+	other.Git("reset", "-q", "--hard", "1.0.0")
+	other.CommitFile("src/other.go", "x", "feat: history rewritten")
+	other.Git("push", "-q", "--force", "origin", "HEAD:main")
+
+	_, err := release.Run(context.Background(), s.opts())
+	if err == nil || !strings.Contains(err.Error(), "rewritten") {
+		t.Fatalf("err = %v, want a refusal", err)
+	}
+	if tags := s.tr.RemoteTags(); !slices.Contains(tags, "1.1.0") {
+		t.Error("the tag was published before the push and must stay")
 	}
 }

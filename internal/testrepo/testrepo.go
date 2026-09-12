@@ -163,16 +163,24 @@ func (r *Repo) RemoteTags() []string {
 func (r *Repo) Head() string { return r.Git("rev-parse", "HEAD") }
 
 // Clone makes a clone of this repository, optionally shallow, and returns it.
-func (r *Repo) Clone(depth int) *Repo {
+func (r *Repo) Clone(depth int) *Repo { return r.cloneFrom(r.Dir, depth) }
+
+// CloneRemote clones the bare origin this repository pushes to -- a second
+// actor on the same remote, for the races a release has to survive.
+func (r *Repo) CloneRemote() *Repo {
+	r.t.Helper()
+	return r.cloneFrom(r.Git("remote", "get-url", "origin"), 0)
+}
+
+func (r *Repo) cloneFrom(src string, depth int) *Repo {
 	r.t.Helper()
 	dst := r.t.TempDir()
 	args := []string{"clone"}
-	src := r.Dir
 	if depth > 0 {
 		// git ignores --depth for local path clones; file:// forces the
 		// transport that can actually truncate history.
 		args = append(args, "--depth", itoa(depth))
-		src = "file://" + r.Dir
+		src = "file://" + src
 	}
 	args = append(args, src, dst)
 	cmd := exec.Command("git", args...)

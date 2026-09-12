@@ -307,6 +307,35 @@ func (r *Repo) Push(remote string, refspecs ...string) error {
 	return err
 }
 
+// FetchRef fetches one ref from a remote and returns the commit it resolved
+// to. Used when a push was rejected: the branch has moved on, and what it
+// moved to is the base the release commit has to be rebuilt on.
+func (r *Repo) FetchRef(remote, ref string) (string, error) {
+	if _, err := r.run("fetch", "--quiet", remote, ref); err != nil {
+		return "", err
+	}
+	return r.run("rev-parse", "FETCH_HEAD")
+}
+
+// ResetHard moves HEAD and the work tree to a commit.
+func (r *Repo) ResetHard(sha string) error {
+	_, err := r.run("reset", "--quiet", "--hard", sha)
+	return err
+}
+
+// IsRejectedPush reports whether a push failed because the remote branch had
+// moved on -- the one failure that is worth a second attempt from a fresh base.
+func IsRejectedPush(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "non-fast-forward") ||
+		strings.Contains(msg, "fetch first") ||
+		strings.Contains(msg, "[rejected]") ||
+		strings.Contains(msg, "cannot lock ref")
+}
+
 // Config sets a repository-local git configuration value.
 func (r *Repo) Config(key, value string) error {
 	_, err := r.run("config", "--local", key, value)

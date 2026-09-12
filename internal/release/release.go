@@ -353,7 +353,7 @@ func run(ctx context.Context, o Options, log *slog.Logger) (*Report, error) {
 
 	// Step 4: the release commit, after the tag on purpose.
 	if cfg.ReleaseCommitEnabled() {
-		st, detail, sha, err := commitChangelog(repo, cfg, res, o, sign, changelogStaged, notes, log)
+		st, detail, sha, err := commitChangelog(repo, cfg, res, o, in, sign, changelogStaged, notes, log)
 		rep.Steps = append(rep.Steps, Step{Name: "release-commit", Status: st, Detail: detail})
 		if err != nil {
 			return rep, err
@@ -418,48 +418,90 @@ func writeChangelog(dir, file string, in render.Input, notes string) (bool, erro
 	return true, os.WriteFile(path, []byte(out), 0o644)
 }
 
+// commitChangelog makes the release commit and pushes it. The push is the one
+// step that races with the rest of the world: on a repository where Renovate
+// merges several times an hour, the default branch has often moved on by the
+// time this runs. semantic-release refuses in that case ("local branch is
+// behind the remote one") and releases nothing; the shadow measured that on
+// 13 of about 450 pushes in one day. Here the tag is already published, so
+// refusing would leave a release without its changelog. Instead the commit is
+// rebuilt on the branch as it is now -- it only ever touches the changelog
+// and the configured assets -- and pushed again, a few times if need be.
 func commitChangelog(repo *git.Repo, cfg *config.Config, res *analyze.Result, o Options,
-	sign, changed bool, notes string, log *slog.Logger) (StepStatus, string, string, error) {
-
-	if err := repo.Add(cfg.ReleaseCommit.Assets...); err != nil {
-		return StepFailed, err.Error(), "", err
-	}
-	staged, err := repo.HasStagedChanges()
-	if err != nil {
-		return StepFailed, err.Error(), "", err
-	}
-	if !staged {
-		log.Info("nothing to commit for the release", "changed", changed)
-		return StepSkipped, "no changes to commit", "", nil
-	}
-
-	msg := config.Vars{Version: res.Version, Tag: res.Tag, Notes: notes}.Expand(cfg.ReleaseCommit.Message)
-	if err := repo.Commit(msg, cfg.ReleaseCommit.Author, sign); err != nil {
-		return StepFailed, err.Error(), "", err
-	}
-	sha, err := repo.HeadSHA()
-	if err != nil {
-		return StepFailed, err.Error(), "", err
-	}
+	in render.Input, sign, changed bool, notes string, log *slog.Logger) (StepStatus, string, string, error) {
 
 	branch := o.Branch
 	if branch == "" {
+		var err error
 		branch, err = repo.CurrentBranch()
 		if err != nil {
-			return StepFailed, err.Error(), sha, err
+			return StepFailed, err.Error(), "", err
 		}
 	}
 	pushURL, err := authenticatedURL(repo, o.remote(), o.Token, o.forgeKind())
 	if err != nil {
-		return StepFailed, err.Error(), sha, err
+		return StepFailed, err.Error(), "", err
 	}
-	if err := repo.Push(pushURL, "HEAD:refs/heads/"+branch); err != nil {
-		masked := repo.Mask(err.Error())
-		return StepFailed, masked, sha, fmt.Errorf("pushing the release commit failed: %s", masked)
+	msg := config.Vars{Version: res.Version, Tag: res.Tag, Notes: notes}.Expand(cfg.ReleaseCommit.Message)
+
+	const attempts = 3
+	for attempt := 1; ; attempt++ {
+		if err := repo.Add(cfg.ReleaseCommit.Assets...); err != nil {
+			return StepFailed, err.Error(), "", err
+		}
+		staged, err := repo.HasStagedChanges()
+		if err != nil {
+			return StepFailed, err.Error(), "", err
+		}
+		if !staged {
+			log.Info("nothing to commit for the release", "changed", changed)
+			return StepSkipped, "no changes to commit", "", nil
+		}
+		if err := repo.Commit(msg, cfg.ReleaseCommit.Author, sign); err != nil {
+			return StepFailed, err.Error(), "", err
+		}
+		sha, err := repo.HeadSHA()
+		if err != nil {
+			return StepFailed, err.Error(), "", err
+		}
+
+		pushErr := repo.Push(pushURL, "HEAD:refs/heads/"+branch)
+		if pushErr == nil {
+			log.Info("release commit pushed", "sha", short(sha), "branch", branch, "signed", sign, "attempt", attempt)
+			subject, _, _ := strings.Cut(msg, "\n")
+			return StepDone, subject, sha, nil
+		}
+		masked := repo.Mask(pushErr.Error())
+		if !git.IsRejectedPush(pushErr) || attempt == attempts {
+			return StepFailed, masked, sha, fmt.Errorf("pushing the release commit failed: %s", masked)
+		}
+
+		// The branch moved. Start again from where it is now -- but only if
+		// the released commit is still part of it; a rewritten branch is not
+		// something to quietly build a changelog on.
+		remoteHead, err := repo.FetchRef(pushURL, branch)
+		if err != nil {
+			return StepFailed, repo.Mask(err.Error()), sha, err
+		}
+		contained, err := repo.IsAncestor(res.Commit, remoteHead)
+		if err != nil {
+			return StepFailed, err.Error(), sha, err
+		}
+		if !contained {
+			err := fmt.Errorf("%s no longer contains the released commit %s (now at %s); not rebuilding the release commit on a rewritten branch",
+				branch, short(res.Commit), short(remoteHead))
+			return StepFailed, err.Error(), sha, err
+		}
+		log.Warn("branch moved on while releasing; rebuilding the release commit on its new head",
+			"branch", branch, "was", short(res.Commit), "now", short(remoteHead), "attempt", attempt)
+		if err := repo.ResetHard(remoteHead); err != nil {
+			return StepFailed, err.Error(), sha, err
+		}
+		changed, err = writeChangelog(repo.Dir(), cfg.Changelog.File, in, notes)
+		if err != nil {
+			return StepFailed, err.Error(), sha, err
+		}
 	}
-	log.Info("release commit pushed", "sha", short(sha), "branch", branch, "signed", sign)
-	subject, _, _ := strings.Cut(msg, "\n")
-	return StepDone, subject, sha, nil
 }
 
 func publishRelease(ctx context.Context, o Options, cfg *config.Config, res *analyze.Result,

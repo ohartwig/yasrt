@@ -389,7 +389,7 @@ For `no-bump` / `not-deliverable`, `RELEASE_VERSION`/`RELEASE_TAG` are empty.
    heading, and adding one would put a line above every file's history at the
    moment it migrates.
 3. **Tag** (F7, part 1): annotated tag on `RELEASE_COMMIT` (not on the release commit — provenance: the tag points at what was built). Push with job token.
-4. **Release commit** (F6): commit `CHANGELOG.md`, message from `release_commit.message`; signature per `sign`. Push to the default branch with job token. **After** the tag, so a failure here leaves a complete release behind, not a half one.
+4. **Release commit** (F6): commit `CHANGELOG.md`, message from `release_commit.message`; signature per `sign`. Push to the default branch with job token. **After** the tag, so a failure here leaves a complete release behind, not a half one. When the push is rejected because the branch has moved on — on a repository where Renovate merges several times an hour that was 13 of ~450 pushes in one day; semantic-release refuses outright in that case and releases nothing — the commit is rebuilt on the branch's new head (it only ever touches the changelog and the configured assets) and pushed again, up to three times. A branch that no longer contains the released commit was rewritten and is refused.
 5. **Forge release** (F7, part 2): the platform's release object for the tag,
    with the notes as its description. Skipped when one already exists for the
    tag. `gitlab_release.assets` entries with `url` become release links —

@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.6.1](https://git.ole-hartwig.eu/yasrt/cli/compare/1.6.0...1.6.1) (2026-09-12)
+
+### :bug: Fixes
+
+* **shadow-report:** count only jobs that spoke as yasrt's shadow ([47dc931](https://git.ole-hartwig.eu/yasrt/cli/commit/47dc931e7df6fec8228b1f5eccd0973321ec02c0))
+* rebuild the release commit when the branch moved on ([c2e85dc](https://git.ole-hartwig.eu/yasrt/cli/commit/c2e85dcd94644f660d483b161bef77cc3ac21c09))
+
+### :memo: Documentation
+
+* **plan:** R8 resolved for image repositories ([c01f3e1](https://git.ole-hartwig.eu/yasrt/cli/commit/c01f3e1aed6cb7f5c8f6e350456322d0cad011e1))
+* record R8 as resolved and the image pilot release ([35b801d](https://git.ole-hartwig.eu/yasrt/cli/commit/35b801d72025dba9fa38f3b924a7f89cd4ea1d85))
+* record the estate-wide shadow rollout and add the verdict report ([6d5613e](https://git.ole-hartwig.eu/yasrt/cli/commit/6d5613ed974d689d797b3ae21e28231d0458004c))
+
 ## [1.6.0](https://git.ole-hartwig.eu/yasrt/cli/compare/1.5.1...1.6.0) (2026-09-11)
 
 ### :sparkles: Features

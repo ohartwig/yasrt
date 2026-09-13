@@ -44,7 +44,7 @@ include:
 Locally:
 
 ```sh
-go install git.ole-hartwig.eu/yasrt/cli/cmd/yasrt@latest
+go install git.ole-hartwig.eu/yasrt/cli/cmd/yasrt@latest   # or @v1.7.0
 ```
 
 Binaries for `linux/amd64` and `linux/arm64` are published to this project's

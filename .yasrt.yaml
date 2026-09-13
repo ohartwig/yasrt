@@ -5,6 +5,13 @@ version: 1
 # registry *and* an image, and its own pipeline is part of neither.
 product: custom
 
+# v-prefixed since 1.7.0: Go modules resolve versions only from tags that carry
+# the prefix, so `go install …@v1.7.0` needs it. The bare tags up to 1.6.1 stay
+# what they are and are still recognised as releases.
+tag_format: "v${version}"
+versioning:
+  previous_tag_formats: ["${version}"]
+
 deliverability:
   non_release_paths:
     - CHANGELOG.md

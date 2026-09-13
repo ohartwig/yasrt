@@ -59,6 +59,13 @@
             "type": "string",
             "pattern": "^[0-9]+\\.([0-9]+\\.)?x$"
           }
+        },
+        "previous_tag_formats": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tag formats earlier releases used, e.g. [\"${version}\"] after switching tag_format to v${version}. Recognised as releases, never used to create a tag, so a repository can change its format without restarting the version series."
         }
       }
     },

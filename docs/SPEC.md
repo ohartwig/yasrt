@@ -121,6 +121,9 @@ tag_format: "${version}"   # F2; default derived from product:
 versioning:                # public request #6
   initial: "1.0.0"         # first version when no tag exists
   major_on_zero: true      # false ⇒ breaking in 0.x only bumps minor
+  previous_tag_formats: [] # formats earlier releases used, e.g. ["${version}"]
+                           # after switching to "v${version}": still recognised
+                           # as releases, never used to create a tag
 
 # F1 – rules: first match per commit, highest bump wins
 rules:

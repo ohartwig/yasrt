@@ -151,6 +151,7 @@ func TestValidation(t *testing.T) {
 		{"bad sign", "product: image\nrelease_commit:\n  sign: maybe\n", "release_commit.sign"},
 		{"trigger without ref", "product: image\nafter_release:\n  triggers:\n    - project: a/b\n", "ref: required"},
 		{"unsupported version", "version: 2\nproduct: image\n", "not supported"},
+		{"previous tag format without placeholder", "product: image\nversioning:\n  previous_tag_formats: [\"release-\"]\n", "previous_tag_formats[0]"},
 		{"asset with url and path", "product: image\ngitlab_release:\n  assets:\n    - name: x\n      url: https://a\n      path: dist/x\n", "not both"},
 		{"asset with neither", "product: image\ngitlab_release:\n  assets:\n    - name: x\n", "url or path is required"},
 		{"link without name", "product: image\ngitlab_release:\n  assets:\n    - url: https://a\n", "name: required"},
@@ -278,5 +279,23 @@ func TestReleaseAuthorDefaultsToTheBotAndStaysOverridable(t *testing.T) {
 	c := load(t, "product: image\nrelease_commit:\n  author: \"Someone Else <s@example.invalid>\"\n")
 	if got := c.ReleaseCommit.Author; got != "Someone Else <s@example.invalid>" {
 		t.Errorf("author = %q — it must stay configurable", got)
+	}
+}
+
+// A repository that changes its tag format keeps its history: old tags are
+// still releases, new tags take the new shape.
+func TestPreviousTagFormats(t *testing.T) {
+	cfg := load(t, "product: custom\ntag_format: \"v${version}\"\ndeliverability:\n  non_release_paths: [docs/**]\nversioning:\n  previous_tag_formats: [\"${version}\", \"release-${version}\"]\n")
+	for tag, want := range map[string]string{"v1.2.3": "1.2.3", "1.2.3": "1.2.3", "release-0.9.0": "0.9.0"} {
+		v, ok := cfg.VersionFromTag(tag)
+		if !ok || v.String() != want {
+			t.Errorf("VersionFromTag(%q) = %v, %v; want %s", tag, v, ok, want)
+		}
+	}
+	if _, ok := cfg.VersionFromTag("build-1.2.3"); ok {
+		t.Error("a format that was never configured must not match")
+	}
+	if got := cfg.Tag(semver.Version{Major: 2}); got != "v2.0.0" {
+		t.Errorf("new tags use the current format, got %q", got)
 	}
 }

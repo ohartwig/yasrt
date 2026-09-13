@@ -702,14 +702,6 @@ func parseAuthor(a string) (name, email string) {
 	return a, ""
 }
 
-func firstNonEmpty(vals ...string) string {
-	for _, v := range vals {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
-}
 
 // pushURL returns the remote's URL with any embedded credentials removed and
 // the token registered as a git credential instead. A token in the URL is a

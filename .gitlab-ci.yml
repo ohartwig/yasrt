@@ -32,10 +32,17 @@ include:
   # dogfooding is supposed to mean — and it makes this repository the first
   # consumer of release-tools/yasrt, so the component is exercised rather than
   # only the binary.
+  # This repository decides and publishes its own release with the binary
+  # under test, not with the released image: the image carries the previous
+  # version, and the first configuration key the new version introduces --
+  # and this repository uses -- would otherwise fail its own release. The
+  # component's jobs stay (defaults layer, rules, artefacts); only the image
+  # and the command are replaced below.
   - component: ${CI_SERVER_HOST}/devops/ci-cd-components/release-tools/yasrt@1
     inputs:
       stage-version: version
       stage-release: release
+      yasrt-image: registry.ole-hartwig.eu/devops/images/golang:1.27
 
 .go-base: &go-base
   image: $GO_IMAGE
@@ -156,7 +163,24 @@ upload:package-registry:
           --upload-file "$f" "${PACKAGE_URL}/${RELEASE_VERSION}/${f}"
       done
 
+# Both release jobs run the binary built from this very commit. `go build`
+# rather than `go run`, so the build error and the decision are two lines.
+version:
+  cache:
+    key:
+      files: [go.sum]
+    paths: [.go/pkg/mod]
+  script:
+    - apk add --no-cache git
+    - go build -o /tmp/yasrt ./cmd/yasrt
+    - /tmp/yasrt next --output .release.env
+
 # The component's release job needs this repository's build, which is named
 # build:binaries here rather than `build`.
 release:
   needs: [version, build:binaries, upload:package-registry]
+  script:
+    - '[ "$RELEASE_STATUS" = "release" ] || { echo "skip: ${RELEASE_STATUS:-unknown}"; exit 0; }'
+    - apk add --no-cache git
+    - go build -o /tmp/yasrt ./cmd/yasrt
+    - /tmp/yasrt release

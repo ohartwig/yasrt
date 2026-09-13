@@ -351,7 +351,7 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
 - [x] **T-172** Two defects in the comparison itself, found by the first real releases:
       `git tag --points-at HEAD` missed the tag on semantic-release's release commit (1.20.2), and
       `needs:` put `shadow:compare` into the DAG so it ran before `release:semver` (1.20.3).
-- [x] **T-173** `scripts/shadow-report.py` collects every verdict on the instance into one table.
+- [x] **T-173** `tools/shadow-report.py` collects every verdict on the instance into one table.
 - [x] **T-174** `devops/images/yasrt` inbound job-token allowlist: all twelve top-level groups.
 - [x] **T-177** R8 resolved — the image release gate. `buildkit-image-build` 2.4.0 takes
       `release-tool: yasrt` and runs build, scan, sign, attest, verify and release-check on the

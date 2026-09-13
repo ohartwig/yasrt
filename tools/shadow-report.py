@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
 # SPDX-License-Identifier: MIT
-"""Collect every shadow:compare verdict on the instance into one table.
+"""Collect every shadow:compare verdict on a GitLab instance into one table.
 
-Usage: scripts/shadow-report.py [--since 2026-09-12] [--json out.json]
+Operator tooling for a migration from semantic-release: while the
+release-tools/yasrt-shadow component runs beside semantic-release, this
+reads every verdict it wrote and lists the disagreements first.
 
-Reads through glab, so it needs a logged-in glab and membership in the
-projects. A verdict comes from the job log of shadow:compare; a pipeline
-without that job is not a shadow pipeline and is ignored.
+Usage: tools/shadow-report.py [--since 2026-09-12] [--group devops] [--json out.json]
+
+Reads through glab, so it needs a logged-in glab (`glab auth login`) and
+membership in the projects; --group restricts the walk to one group and
+its subgroups. A verdict comes from the job log of shadow:compare; a
+pipeline without that job is not a shadow pipeline and is ignored.
 """
 import argparse, concurrent.futures as cf, json, re, subprocess, sys
 from collections import Counter
@@ -15,10 +20,11 @@ from collections import Counter
 def api(path):
     return json.loads(subprocess.check_output(["glab", "api", path], stderr=subprocess.DEVNULL))
 
-def projects():
+def projects(group=""):
     page, out = 1, []
+    base = f"groups/{group.replace('/', '%2F')}/projects?include_subgroups=true" if group else "projects?"
     while True:
-        ps = api(f"projects?archived=false&simple=true&per_page=100&page={page}&order_by=id&sort=asc")
+        ps = api(f"{base}&archived=false&simple=true&per_page=100&page={page}&order_by=id&sort=asc")
         if not ps:
             return out
         out += ps
@@ -60,11 +66,12 @@ def verdicts(p, since):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--since", default="")
+    ap.add_argument("--group", default="", help="restrict to one group and its subgroups")
     ap.add_argument("--json", default="")
     a = ap.parse_args()
     rows = []
     with cf.ThreadPoolExecutor(8) as ex:
-        for r in ex.map(lambda p: verdicts(p, a.since), projects()):
+        for r in ex.map(lambda p: verdicts(p, a.since), projects(a.group)):
             rows += r
     rows.sort(key=lambda r: (r["verdict"] != "DIFFER", r["project"], r["created_at"]))
     by = Counter(r["verdict"] for r in rows)

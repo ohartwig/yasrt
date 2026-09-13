@@ -157,7 +157,7 @@ locally (`yasrt next` on a developer machine is a documented use).
 - **N2** `internal/gitlab` is now the protection-rule probe only; rename to
   `internal/gitlabprobe` or fold into `forge` so the package name says what it
   does.
-- **N3** `scripts/shadow-report.py` needs `glab` and the estate's project
+- **N3** `tools/shadow-report.py` needs `glab` and the estate's project
   layout. Either generalise (`--host`, `--group`) or move to an
   `ops/`/`tools/` directory with a note that it is operator tooling.
 - **N4** A `docs/examples/` directory with one complete `.gitlab-ci.yml` and

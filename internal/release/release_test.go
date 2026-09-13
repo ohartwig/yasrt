@@ -626,7 +626,7 @@ func TestSigningProducesVerifiableSignatures(t *testing.T) {
 		}
 
 		// Verify with git, against an allowed-signers file — the same
-		// mechanism .gitsigners uses for human commits in this estate.
+		// mechanism git itself uses for human commits (gpg.ssh.allowedSignersFile).
 		allowed := filepath.Join(keyDir, "allowed_signers")
 		if err := os.WriteFile(allowed, []byte("release-bot "+string(pub)), 0o600); err != nil {
 			t.Fatal(err)

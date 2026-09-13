@@ -442,7 +442,7 @@ Consequence for `rules:`: GitLab evaluates `rules` at pipeline creation, **befor
 
 **Signing formats.** The variable may hold either an armoured OpenPGP private key or an OpenSSH private key, base64-encoded (raw armour is accepted too). yasrt detects which from the material: an OpenSSH key sets `gpg.format=ssh` and points `user.signingkey` at a 0600 file that is removed when the run ends; an OpenPGP key is imported into the job's keyring. Both paths are covered by tests that generate real keys and verify the resulting objects with `git verify-tag` and `git verify-commit`.
 
-SSH is the format with a future here: GitLab verifies SSH signatures, and the estate already trusts SSH keys for human commits through `.gitsigners`. The roadmap remains a short-lived key from Vault via OIDC. Sigstore commit signatures are not verified by GitLab and are therefore not a target.
+SSH is the format with a future here: all three forges verify SSH signatures, and an organisation that already trusts SSH keys for human commits needs no second key type. The roadmap remains a short-lived key from Vault via OIDC. Sigstore commit signatures are not verified by GitLab and are therefore not a target.
 
 **Who may release — the authority invariant.** A `CI_JOB_TOKEN` push acts as *the user who triggered the pipeline*, and on the default branch that is whoever merged. The tag push therefore succeeds exactly when:
 

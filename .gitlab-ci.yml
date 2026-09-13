@@ -187,3 +187,49 @@ release:
     - apk add --no-cache git
     - go build -o /tmp/yasrt ./cmd/yasrt
     - /tmp/yasrt release
+
+# The public mirror. A GitLab push mirror copies the repository as it is;
+# this one leaves out what is working material of this instance rather than
+# part of the project -- the agent guidance and the allowed-signers list --
+# by rewriting the history without those paths and force-pushing the result.
+# git filter-repo is deterministic, so the rewritten commits keep their ids
+# from run to run and the tags on GitHub stay put once published. Runs after
+# `release`, so a tag made in this pipeline is mirrored in the same one; a
+# push made with the job token starts no pipeline, so nothing runs twice.
+#
+# GITHUB_MIRROR_TOKEN is a fine-grained token with contents:write on the
+# mirror repository -- the one stored secret this repository has, and it is
+# about publishing the project, not about releasing it.
+mirror:github:
+  stage: .post
+  needs:
+    - job: release
+      optional: true
+      artifacts: false
+  image:
+    name: registry.ole-hartwig.eu/devops/ci-mirrors/python:3-alpine@sha256:05b2b8b732ecd268fee8727a369f936f022d1321b59befd13c30ede22769dcdc
+    entrypoint: [""]
+  variables:
+    GIT_DEPTH: 0
+    GIT_STRATEGY: clone
+  rules:
+    - if: $GITHUB_MIRROR_TOKEN == null
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+  script:
+    - apk add --no-cache git
+    - pip install --quiet --root-user-action=ignore git-filter-repo
+    - |
+      set -eu
+      # A fresh clone with every tag: the checkout the runner made has the
+      # branch only, and filter-repo wants a clean repository.
+      git clone --quiet --mirror "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" /tmp/mirror
+      cd /tmp/mirror
+      git filter-repo --quiet --invert-paths \
+        --path CLAUDE.md --path .gitsigners --path .gitsigners.d --path .gitlab/
+      # Only the default branch and the release tags go public.
+      git for-each-ref --format='%(refname)' refs/heads | grep -vx "refs/heads/${CI_DEFAULT_BRANCH}" | xargs -r -n1 git update-ref -d
+      git for-each-ref --format='%(refname)' refs/tags | grep -v '^refs/tags/v' | xargs -r -n1 git update-ref -d
+      git push --quiet --force --prune "https://x-access-token:${GITHUB_MIRROR_TOKEN}@github.com/ohartwig/yasrt.git" \
+        "refs/heads/${CI_DEFAULT_BRANCH}:refs/heads/${CI_DEFAULT_BRANCH}" 'refs/tags/*:refs/tags/*'
+      echo "mirrored $(git rev-parse --short "${CI_DEFAULT_BRANCH}") and $(git tag | wc -l) tag(s) to github.com/ohartwig/yasrt"

@@ -50,9 +50,9 @@ go install github.com/ohartwig/yasrt/cmd/yasrt@latest   # or a version: @v1.8.0
 ```
 
 **Container.** `registry.ole-hartwig.eu/devops/images/yasrt:1` is the image the
-CI examples below use. It is a 30 MB Wolfi image with `git`, `gpg` and
-`ssh-keygen`; build your own from the same recipe if you would rather not pull
-ours.
+CI examples below use: 30 MB of Wolfi with `git`, `gpg` and `ssh-keygen`. Its
+recipe and pipeline are public at <https://github.com/ohartwig/yasrt-image>;
+build your own from it if you would rather not pull ours.
 
 ## Use
 

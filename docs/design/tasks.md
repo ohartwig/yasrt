@@ -371,6 +371,27 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
 - [ ] **T-176** Cut-over: swap `semantic-release@1` for `yasrt@1` in the eight composed flavours
       and the direct consumers, enable the push setting per repository, remove the shadow.
 
+## P14 — Open-source publication (docs/design/oss-readiness-review.md)
+
+- [x] **T-180** B1: `versioning.previous_tag_formats`; this repository tags `v${version}` since
+      v1.7.0; module path `github.com/ohartwig/yasrt` since v1.8.0 (not a v2: no importer, and a
+      major would demand a `/v2` suffix).
+- [x] **T-181** B2: neutral defaults in the binary; the estate's values are a layer in
+      release-tools 1.22.0 (`yasrt` and `yasrt-shadow`).
+- [x] **T-182** S1–S4: credential helper instead of a token in the URL; hook output masked;
+      private `GNUPGHOME`; no duplicate release creation after an ambiguous failure.
+- [x] **T-183** B3/B4/S6: public README with examples, neutral SECURITY.md, design history under
+      `docs/design/`, `component/` removed, darwin binaries.
+- [x] **T-184** S5, N1–N7: `release` split by concern, `errors.AsType`, `gitlabprobe`, report
+      script under `tools/` with `--group`, check message for GitHub/Forgejo, mise/renovate notes.
+- [x] **T-185** The self-release decides with the binary under test, not the released image —
+      found when `previous_tag_formats` broke the repository's own release.
+- [x] **T-186** Found after the review: GitHub release assets come from a workflow on the mirror
+      (`.github/workflows/release-assets.yml`); `.gitsigners` removed; CONTRIBUTING for outsiders;
+      the image repository is mirrored to `github.com/ohartwig/yasrt-image`.
+- [ ] **T-187** Publish: create the two GitHub repositories, GitLab push mirrors including tags,
+      verify `go install github.com/ohartwig/yasrt/cmd/yasrt@v1.8.0` and the release assets.
+
 ## P12 — semantic-release parity
 
 - [x] **T-160** `hooks.on_failure` (≈ `failCmd`): runs when `release` is about to exit non-zero,

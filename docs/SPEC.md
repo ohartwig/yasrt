@@ -409,7 +409,7 @@ For `no-bump` / `not-deliverable`, `RELEASE_VERSION`/`RELEASE_TAG` are empty.
    and Forgejo they are attached to the release after it is created, where a
    failed upload fails the job but leaves the release — a re-run skips it, so
    the file is attached by hand.
-6. **Follow-up trigger** (F9): `POST /projects/:id/trigger/pipeline` per entry in `after_release.triggers`, header `JOB-TOKEN`. Errors are logged, exit stays `0`. GitLab only — on the other forges every trigger is reported as undeliverable in `release-report.json` rather than guessed at.
+6. **Follow-up trigger** (F9): `POST /projects/:id/trigger/pipeline` per entry in `after_release.triggers`, header `JOB-TOKEN`. `project`, `ref` and every variable expand `${version}`, `${tag}` and `${CI_*}` environment references, so a repository can trigger its own tag pipeline (`project: "${CI_PROJECT_PATH}", ref: "${tag}"`) — the one the job-token push does not start. Errors are logged, exit stays `0`. GitLab only — on the other forges every trigger is reported as undeliverable in `release-report.json` rather than guessed at.
 
 Rationale for the order: steps 3–5 are individually idempotent; a re-run after a failure at step 4 finds the tag, skips 3, repeats 4–6.
 

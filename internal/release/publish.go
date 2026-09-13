@@ -151,11 +151,19 @@ func runTriggers(ctx context.Context, o Options, cfg *config.Config, res *analyz
 			r.Error = fmt.Sprintf("%s has no pipeline-trigger endpoint", o.Forge.Kind())
 			log.Warn("follow-up trigger not delivered", "forge", string(o.Forge.Kind()), "project", t.Project)
 		default:
+			// Project and ref expand like the variables do, so a repository
+			// whose build runs on the tag pipeline can start that pipeline
+			// itself: project ${CI_PROJECT_PATH}, ref ${tag}. A push with the
+			// job token starts none, and this is the sanctioned way to get one.
+			expand := func(s string) string {
+				return expandEnv(config.Vars{Version: res.Version, Tag: res.Tag}.Expand(s))
+			}
 			vars := make(map[string]string, len(t.Variables))
 			for k, v := range t.Variables {
-				vars[k] = expandEnv(config.Vars{Version: res.Version, Tag: res.Tag}.Expand(v))
+				vars[k] = expand(v)
 			}
-			url, err := triggerer.TriggerPipeline(ctx, t.Project, t.Ref, vars)
+			r.Project, r.Ref = expand(t.Project), expand(t.Ref)
+			url, err := triggerer.TriggerPipeline(ctx, r.Project, r.Ref, vars)
 			if err != nil {
 				// Non-fatal by design: the release is already published.
 				r.Error = err.Error()

@@ -702,7 +702,6 @@ func parseAuthor(a string) (name, email string) {
 	return a, ""
 }
 
-
 // pushURL returns the remote's URL with any embedded credentials removed and
 // the token registered as a git credential instead. A token in the URL is a
 // token in the argument list, which every process in the container can read;

@@ -43,6 +43,7 @@ include:
       stage-version: version
       stage-release: release
       yasrt-image: registry.ole-hartwig.eu/devops/images/golang:1.27
+      mr-comments: 'true'
 
 .go-base: &go-base
   image: $GO_IMAGE

@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.7.0](https://git.ole-hartwig.eu/yasrt/cli/compare/1.6.1...v1.7.0) (2026-09-13)
+
+### :sparkles: Features
+
+* keep the history when tag_format changes, and tag this repository v-prefixed ([21e9e0c](https://git.ole-hartwig.eu/yasrt/cli/commit/21e9e0cc26c4ebcbbec9704ce361b39f27c9dbff))
+
+### :bug: Fixes
+
+* **ci:** decide and release with the binary under test ([e91d30b](https://git.ole-hartwig.eu/yasrt/cli/commit/e91d30ba9d1394091a2d98083215a20781f286f3))
+* do not retry a release creation that already took effect ([157b4cf](https://git.ole-hartwig.eu/yasrt/cli/commit/157b4cff68425a51ff2cd629949aa31d905e7a9d))
+* import the OpenPGP signing key into a keyring of its own ([6f13a0a](https://git.ole-hartwig.eu/yasrt/cli/commit/6f13a0a315eee7352ff3d4628620d9599e2821f1))
+* mask secrets in hook output before it reaches the report ([76259b0](https://git.ole-hartwig.eu/yasrt/cli/commit/76259b0a01191c90413409bf6c9f9a10873c5c40))
+* hand git the token through a credential helper, not the URL ([ec24751](https://git.ole-hartwig.eu/yasrt/cli/commit/ec247512a0515af8eea6003d6c75661e2718b962))
+
+### :memo: Documentation
+
+* open-source readiness review at 1.6.1 ([8c05894](https://git.ole-hartwig.eu/yasrt/cli/commit/8c05894b4b0e2a90a3cf02d8f85eb86e01e053df))
+
+### :barber: Styles
+
+* gofmt after removing the helper ([378f36a](https://git.ole-hartwig.eu/yasrt/cli/commit/378f36ab355d5fcda08ade56bd7133795c90d325))
+
+### :zap: Refactor
+
+* defaults an organisation would not recognise as its own ([1b94ff2](https://git.ole-hartwig.eu/yasrt/cli/commit/1b94ff21085d1d30dcb1696ee69cf96e529f7475))
+
 ## [1.6.1](https://git.ole-hartwig.eu/yasrt/cli/compare/1.6.0...1.6.1) (2026-09-12)
 
 ### :bug: Fixes

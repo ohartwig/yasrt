@@ -121,6 +121,12 @@ merge to the default branch must be allowed to create the release tag —
 `yasrt check` verifies both. A push made with the job token starts no pipeline,
 which is what keeps the release commit from releasing again.
 
+Two things the old chain did that the binary does not, because they need a
+token beyond the job token: telling merge requests and issues that they
+shipped, and anything else that writes to the forge on the release's behalf.
+`contrib/gitlab-release-comments.py` is the first of those as a job that runs
+after `release` -- see `contrib/README.md`.
+
 A repository whose publishing has to run *on the tag* — say, because a signing
 role's OIDC trust is scoped to `ref_type:tag` — keeps that pipeline by having
 the release start it: `after_release.triggers` expands `${tag}`, `${version}`

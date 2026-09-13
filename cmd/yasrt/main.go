@@ -95,8 +95,7 @@ func classify(err error) int {
 	if err == nil {
 		return exitOK
 	}
-	var ec *exitCodeError
-	if errors.As(err, &ec) {
+	if ec, ok := errors.AsType[*exitCodeError](err); ok {
 		if ec.err != nil && !errors.Is(ec.err, errSilent) {
 			fmt.Fprintln(os.Stderr, "yasrt: "+ec.err.Error())
 		}

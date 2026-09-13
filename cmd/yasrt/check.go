@@ -15,7 +15,7 @@ import (
 	"git.ole-hartwig.eu/yasrt/cli/internal/deliver"
 	"git.ole-hartwig.eu/yasrt/cli/internal/forge"
 	"git.ole-hartwig.eu/yasrt/cli/internal/git"
-	"git.ole-hartwig.eu/yasrt/cli/internal/gitlab"
+	"git.ole-hartwig.eu/yasrt/cli/internal/gitlabprobe"
 	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
 )
 
@@ -147,7 +147,7 @@ func cmdCheck(args []string) error {
 			"not probed on %s; make sure the token may create tags matching %s", env.Kind, cfgTagFormat(cfg)))
 	case env.APIURL != "" && env.Repo != "" && token != "" && cfg != nil:
 		out = append(out, probeReleaseAuthority(
-			gitlab.New(env.APIURL, env.Repo, token), cfg,
+			gitlabprobe.New(env.APIURL, env.Repo, token), cfg,
 			firstNonEmptyStr(env.DefaultBranch, "main")))
 	default:
 		add("release authority", true, false,
@@ -214,7 +214,7 @@ func probePushPermission(repo *git.Repo, remote string, kind forge.Kind, token s
 // nothing needs weakening; if Developers may merge but not tag, every release
 // they trigger dies at the tag push, and the repository is misconfigured rather
 // than yasrt being at fault.
-func probeReleaseAuthority(c *gitlab.Client, cfg *config.Config, defaultBranch string) checkResult {
+func probeReleaseAuthority(c *gitlabprobe.Client, cfg *config.Config, defaultBranch string) checkResult {
 	ctx := context.Background()
 	const name = "release authority"
 
@@ -224,7 +224,7 @@ func probeReleaseAuthority(c *gitlab.Client, cfg *config.Config, defaultBranch s
 		// not the same as there being nothing to see.
 		return checkResult{Name: name, Fatal: true, Detail: "could not read the branch protection rules: " + err.Error()}
 	}
-	var branch *gitlab.ProtectedBranch
+	var branch *gitlabprobe.ProtectedBranch
 	for i := range branches {
 		if tagRuleMatches(branches[i].Name, defaultBranch) {
 			branch = &branches[i]
@@ -262,9 +262,9 @@ func probeReleaseAuthority(c *gitlab.Client, cfg *config.Config, defaultBranch s
 // matchingTagRule finds the protected-tag rule that governs the tags yasrt
 // creates. GitLab rules are wildcards; the tag format's fixed prefix is enough
 // to tell which one applies.
-func matchingTagRule(tags []gitlab.ProtectedTag, cfg *config.Config) (gitlab.ProtectedTag, bool) {
+func matchingTagRule(tags []gitlabprobe.ProtectedTag, cfg *config.Config) (gitlabprobe.ProtectedTag, bool) {
 	sample := cfg.Tag(semver.Version{Major: 9, Minor: 9, Patch: 9})
-	var best gitlab.ProtectedTag
+	var best gitlabprobe.ProtectedTag
 	found := false
 	for _, t := range tags {
 		if !tagRuleMatches(t.Name, sample) {

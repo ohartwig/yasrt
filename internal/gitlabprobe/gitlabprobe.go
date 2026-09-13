@@ -1,13 +1,15 @@
 // SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
 // SPDX-License-Identifier: MIT
 
-// Package gitlab talks to the three GitLab endpoints yasrt needs: create a
-// release, attach a release link, and trigger a pipeline in another project.
+// Package gitlabprobe reads the two protection rule sets `yasrt check`
+// compares -- who may merge into the default branch, who may create the
+// release tag -- so that a repository where the two disagree is reported
+// before its first release fails at the tag push. Publishing goes through
+// internal/forge; this package only looks.
 //
-// There is no client library here on purpose. Three endpoints do not justify a
-// dependency tree in a tool whose reason for existing is dependency reduction,
-// and release jobs commonly call these endpoints with curl already.
-package gitlab
+// There is no client library here on purpose: two endpoints do not justify a
+// dependency tree in a tool whose reason for existing is dependency reduction.
+package gitlabprobe
 
 import (
 	"bytes"
@@ -89,10 +91,9 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 		}
 		lastErr = err
 
-		var apiErr *APIError
-		retryable := errors.As(err, &apiErr) && apiErr.Retryable()
-		if !errors.As(err, &apiErr) {
-			retryable = true // transport failure
+		retryable := true // a transport failure is worth another try
+		if apiErr, ok := errors.AsType[*APIError](err); ok {
+			retryable = apiErr.Retryable()
 		}
 		if !retryable || attempt == attempts {
 			return err

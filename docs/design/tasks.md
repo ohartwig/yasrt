@@ -361,15 +361,36 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
       `golden-image` (composed 2.5.0) exposes `release-tool`. Pilot `devops/images/yasrt`
       released **1.4.0** this way on 2026-09-11 21:48: tag on the merge commit, image signed,
       attested and verified before the tag existed, no tag pipeline, no release-commit pipeline.
-- [ ] **T-178** `container-scanning!300` (empty digest on a no-release push is "nothing to
-      scan") — pipeline green, merge blocked by the review policy; then the pin in
-      `buildkit-image-build` follows via Renovate. Until then a no-bump push to a migrated image
-      repository fails at `container_scanning`.
-- [ ] **T-179** Push setting on the 95 guarded consumers: `scratchpad/enable-push-setting.sh`,
-      needs a Maintainer. The pilot got it by hand.
-- [ ] **T-175** Read the verdicts on 2026-09-13; every DIFFER explained or fixed before cut-over.
-- [ ] **T-176** Cut-over: swap `semantic-release@1` for `yasrt@1` in the eight composed flavours
-      and the direct consumers, enable the push setting per repository, remove the shadow.
+- [x] **T-178** `container-scanning` 4.1.0 (empty digest on a no-release push is "nothing to
+      scan"), pinned by `buildkit-image-build` 2.4.1.
+- [x] **T-179** Push setting on the 95 guarded consumers, run by a Maintainer on 2026-09-12; the
+      stragglers (s3mail, its ios app, the two proof repositories) by hand on 2026-09-13.
+- [x] **T-175** Verdicts read on 2026-09-13: ~650 comparisons, no version disagreement; the
+      differences were the comparison's own (T-172) and the deliverability window (I-081).
+- [x] **T-176** Cut-over, 2026-09-13. Wave 1a: the 13 `ci-cd-components` repositories, the two
+      proof repositories, `moselwal/dev`, `lint-tools`, `unicepta/website-2022` (3.1.0, the
+      frontend build script restored from history), `s3mail` and its ios app (1.0.0, its first
+      tag ever), `buildkit-image-build`. Wave 1b: 28 consumers of the package and extension
+      flavours through `release-tool: yasrt` on the bundle include. `composed-default-pipelines`
+      2.6.x carries the switch in every releasing flavour; the shadow leaves with each swap.
+- [x] **T-188** Found by s3mail's first release: its macOS signing job cannot assume the
+      code-signing role on a branch pipeline — the OIDC trust is scoped to `ref_type:tag` on
+      purpose (`koh-infra`). yasrt 1.9.0 expands `${tag}` in a trigger's `project` and `ref`,
+      release-tools 1.25.0 wraps that as `tag-pipeline: 'true'` (the release triggers the own
+      project on the tag it cut, the tag-gated jobs run unchanged) and adds `non-release-paths`
+      and `trigger-renovate`; s3mail, `wolfi-packages` and the four tag-publishing flavours
+      (oras-app-*, typo3-deploy-shared) use it. Same release: the loop guard recognises the
+      release commit by type *and* scope — the scope alone swallowed a `feat(release)`.
+- [ ] **T-189** Wave 2: the 47 image repositories (`release-tool: yasrt` on the golden-image
+      include; build and scan rules admit the default-branch push; custom tags become
+      `${CI_COMMIT_TAG:-$RELEASE_TAG}-<series>`). Then `release-tools` itself, and the removal
+      of `semantic-release@1` and `yasrt-shadow@1` once nothing includes them.
+- [ ] **T-190** `devops/renovate-runner` job-token allowlist for the estate's groups, so
+      `trigger-renovate: 'true'` reaches the fast lane with the job token
+      (`scratchpad/allow-renovate-trigger.sh`, needs a Maintainer).
+- [ ] **T-191** Production performance comparison after ~100 releases: `tools/cutover-report.py`
+      (first figures: `version` ~1 s and `release` 1–14 s against 42–50 s of script time for
+      semantic-release).
 
 ## P14 — Open-source publication (docs/design/oss-readiness-review.md)
 
@@ -389,8 +410,12 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
 - [x] **T-186** Found after the review: GitHub release assets come from a workflow on the mirror
       (`.github/workflows/release-assets.yml`); `.gitsigners` removed; CONTRIBUTING for outsiders;
       the image repository is mirrored to `github.com/ohartwig/yasrt-image`.
-- [ ] **T-187** Publish: create the two GitHub repositories, GitLab push mirrors including tags,
-      verify `go install github.com/ohartwig/yasrt/cmd/yasrt@v1.8.0` and the release assets.
+- [x] **T-187** Published 2026-09-13: `github.com/ohartwig/yasrt` and `ohartwig/yasrt-image`,
+      filtered mirrors from the `mirror:github` job (`git filter-repo` keeps CLAUDE.md,
+      `.gitsigners`, `.gitlab/`, renovate/mise/lefthook out of the public history; only the
+      default branch and `v*` tags), release assets from the workflow (v1.8.1 verified),
+      `go install github.com/ohartwig/yasrt/cmd/yasrt@v1.8.0` works. Dependency updates on
+      GitHub are pinup's once it speaks GitHub — no dependabot.
 
 ## P12 — semantic-release parity
 

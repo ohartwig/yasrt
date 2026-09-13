@@ -381,10 +381,19 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
       and `trigger-renovate`; s3mail, `wolfi-packages` and the four tag-publishing flavours
       (oras-app-*, typo3-deploy-shared) use it. Same release: the loop guard recognises the
       release commit by type *and* scope — the scope alone swallowed a `feat(release)`.
-- [ ] **T-189** Wave 2: the 47 image repositories (`release-tool: yasrt` on the golden-image
-      include; build and scan rules admit the default-branch push; custom tags become
-      `${CI_COMMIT_TAG:-$RELEASE_TAG}-<series>`). Then `release-tools` itself, and the removal
-      of `semantic-release@1` and `yasrt-shadow@1` once nothing includes them.
+- [~] **T-189** Wave 2, 2026-09-13: 38 of the 44 golden-image consumers on `release-tool: yasrt`
+      (build and scan rules admit the default-branch push; crowdsec's VEX image test resolves
+      `RELEASE_TAG`), every main pipeline green with "nothing to do" on the `ci:` commit. Not
+      migrated: the four exporters (they never used semantic-release — a hand-written
+      `release:from-package`), `mariadb` (two series, `$CI_COMMIT_TAG-11.8`/`-12.3` in inputs
+      that shell-expand to `-11.8` without a tag) and `pa11y-ci` (a test job whose `image:` is
+      the released tag) — both want either the `${CI_COMMIT_TAG:-$RELEASE_TAG}` form where a
+      script expands it or the tag-pipeline mode on the golden-image bundle. Then
+      `release-tools` itself, and the removal of `semantic-release@1` and `yasrt-shadow@1`.
+- [x] **T-192** Found by the tag-pipeline trigger: GitLab's trigger endpoint ignores the
+      `JOB-TOKEN` header and wants the token in the body — every follow-up trigger before
+      1.9.1 failed with 400 "token is missing", non-fatally and therefore unnoticed. The test
+      server now refuses a trigger without one.
 - [ ] **T-190** `devops/renovate-runner` job-token allowlist for the estate's groups, so
       `trigger-renovate: 'true'` reaches the fast lane with the job token
       (`scratchpad/allow-renovate-trigger.sh`, needs a Maintainer).

@@ -6,7 +6,7 @@
 //
 // The range matters as much as the patterns. The npm component this replaces
 // compared the push range, so a fix bundled with a CI change never shipped
-// (improvement item I-081). yasrt compares lastTag..HEAD, the range that is
+// (the defect that motivated this tool). yasrt compares lastTag..HEAD, the range that is
 // actually unreleased.
 package deliver
 

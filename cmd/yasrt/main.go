@@ -4,8 +4,8 @@
 // Command yasrt decides whether a repository should be released, and publishes
 // the release once the artefact exists.
 //
-// The CLI uses the standard library flag package. Every Go binary in this
-// estate does, and a release tool is a poor place to spend a dependency.
+// The CLI uses the standard library flag package: a release tool is a poor
+// place to spend a dependency.
 package main
 
 import (

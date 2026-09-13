@@ -178,7 +178,7 @@ func (c Commit) Footer(token string) (string, bool) {
 
 // HasMarker reports whether the message carries a bracketed marker such as
 // "[skip release]", anywhere, or a footer whose token matches it once dashes
-// and spaces are treated alike. Both spellings appear in this estate.
+// and spaces are treated alike. Both spellings occur in the wild.
 func (c Commit) HasMarker(marker string) bool {
 	marker = strings.TrimSpace(marker)
 	if marker == "" {

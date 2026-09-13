@@ -41,17 +41,18 @@ const (
 // second of the three loop guards (SPEC §6.3).
 const ReleaseScope = "release"
 
-// DefaultReleaseAuthor is the identity release commits are made under when a
-// repository does not name its own. It continues the identity the npm
-// component used, so history stays attributable across the migration.
-const DefaultReleaseAuthor = "KOH Release Bot <release-bot@ole-hartwig.eu>"
+// DefaultReleaseAuthor is the identity release commits are made under when
+// neither the repository nor a defaults layer names one. A placeholder on a
+// reserved domain, so that it is obviously not a person and never routes
+// mail; an organisation sets its own bot identity in its shared defaults.
+const DefaultReleaseAuthor = "yasrt <yasrt@noreply.invalid>"
 
 // Placeholders substituted in tag_format and in the message templates.
 const (
 	VersionPlaceholder = "${version}"
 	// TagPlaceholder matters wherever the two differ: with a v-prefixed
-	// tag_format, "2.5.1" and "v2.5.1" are not interchangeable, and the
-	// estate's dependency-update trigger sends the tag, not the version.
+	// tag_format, "2.5.1" and "v2.5.1" are not interchangeable, and a
+	// follow-up pipeline usually wants the tag it can check out.
 	TagPlaceholder = "${tag}"
 	// NotesPlaceholder puts the rendered release notes in a template. The npm
 	// preset this replaces writes them into the release-commit body, so
@@ -106,9 +107,9 @@ type Versioning struct {
 	MajorOnZero *bool  `yaml:"major_on_zero"`
 	// Prereleases maps a branch to the identifier its releases carry, e.g.
 	// {develop: rc} to cut 2.5.0-rc.1 from develop. A branch that is absent
-	// cuts stable releases. Both shapes live in this estate: gsb11 puts the
-	// prerelease on main and cuts stable from `release`, moselwal-packages
-	// does the opposite.
+	// cuts stable releases. Both shapes occur in practice: the prerelease on
+	// the default branch with stable cut from a release branch, and the
+	// opposite.
 	Prereleases map[string]string `yaml:"prereleases"`
 	// Maintenance lists branches that release inside a fixed version range,
 	// written the way semantic-release writes them: "1.x" keeps a release
@@ -286,9 +287,10 @@ type Trigger struct {
 // yasrt appends ".N" itself, so the configured part must not carry one.
 var prereleaseIdentifierRE = regexp.MustCompile(`^[0-9A-Za-z-]+$`)
 
-// DefaultRules is the rule set from SPEC §5. Anything not listed produces no
-// release, which is why build and revert are absent: both are allowed commit
-// types in this estate but neither ships anything.
+// DefaultRules matches what semantic-release's conventionalcommits preset
+// releases, so a repository moving over gets the versions it is used to.
+// Anything not listed produces no release; an organisation that ships
+// dependency bumps as patches adds `chore` in its shared defaults.
 func DefaultRules() []Rule {
 	yes := true
 	return []Rule{
@@ -296,12 +298,12 @@ func DefaultRules() []Rule {
 		{Type: "feat", Release: "minor"},
 		{Type: "fix", Release: "patch"},
 		{Type: "perf", Release: "patch"},
-		{Type: "chore", Release: "patch"},
+		{Type: "revert", Release: "patch"},
 	}
 }
 
-// DefaultSections is the fixed changelog order from SPEC §5. The estate's npm
-// preset used :repeat: for both ci and chore; :wrench: disambiguates chores.
+// DefaultSections is the changelog order from SPEC §5, with the emoji titles
+// the conventional-changelog presets popularised. Configurable per section.
 func DefaultSections() []Section {
 	return []Section{
 		{Type: "feat", Title: ":sparkles: Features"},
@@ -317,24 +319,26 @@ func DefaultSections() []Section {
 }
 
 // derivedNonReleasePaths implements SPEC §5.1. Note the asymmetry: for an
-// image, .gitlab-ci.yml builds the deliverable and therefore is one; for a
-// package it is not. The estate uses lefthook, never .pre-commit-config.yaml.
+// image, the CI configuration builds the deliverable and therefore is part of
+// it; for a package it is not. Tooling files of a particular organisation
+// (hook manifests, editor settings) belong in `extra_non_release_paths` of
+// its shared defaults, not here.
 func derivedNonReleasePaths(p Product) []string {
 	switch p {
 	case ProductImage:
-		return []string{"CHANGELOG.md", "README.md", "docs/**", "lefthook.yml"}
+		return []string{"CHANGELOG.md", "README.md", "docs/**"}
 	case ProductPackage, ProductExtension:
 		return []string{
 			"CHANGELOG.md", "README.md", "docs/**",
-			".gitlab-ci.yml", "lefthook.yml", ".gitlab/**",
+			".gitlab-ci.yml", ".gitlab/**", ".github/**",
 		}
 	}
 	return nil
 }
 
-// derivedTagFormat implements decision D5: tooling and images tag bare
-// (1.16.12), publishable packages tag with a v prefix (v2.5.1). Both shapes are
-// live in this estate today, carried by the old component's tag-format input.
+// derivedTagFormat implements decision D5: images and tooling tag bare
+// (1.16.12), publishable packages tag with a v prefix (v2.5.1) — the shape
+// Composer, npm and Go expect.
 func derivedTagFormat(p Product) string {
 	switch p {
 	case ProductPackage, ProductExtension:

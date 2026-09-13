@@ -14,11 +14,11 @@ import (
 	yaml "go.yaml.in/yaml/v3"
 )
 
-// Layered configuration exists because this estate deliberately keeps release
-// configuration central: ninety repositories carry no release config of their
-// own, and the shared CI template says so in as many words. What the npm chain
-// got wrong was not central defaults but their transport — a preset package
-// resolved at run time, which is where the unpinned dependencies came from.
+// Layered configuration exists because an organisation usually keeps release
+// configuration central: most repositories carry none of their own and rely
+// on what the shared CI template provides. What semantic-release's shareable
+// configs get wrong is not central defaults but their transport — a package
+// resolved at run time, which is where the unpinned dependencies come from.
 //
 // Defaults therefore arrive as plain files, written by the component that the
 // consuming repository already includes and pins. No registry, no network, no

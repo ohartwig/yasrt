@@ -132,9 +132,11 @@ rules:
     release: patch
   - type: perf
     release: patch
-  - type: chore
+  - type: revert
     release: patch
-  # everything else: no release
+  # everything else: no release. The defaults follow semantic-release's
+  # preset; an organisation that ships dependency bumps adds chore → patch
+  # in its shared defaults file.
 
 ignore:                    # public request #7
   scopes: [release]        # mandatory default: our own release commit
@@ -166,7 +168,8 @@ release_commit:            # F6
   message: "chore(release): ${version}"
   assets: [CHANGELOG.md]
   sign: auto               # auto | required | off  (auto: sign if a key is present)
-  author: "KOH Release Bot <release-bot@ole-hartwig.eu>"   # default; overridable
+  author: "yasrt <yasrt@noreply.invalid>"   # default placeholder; an organisation
+                                             # sets its bot identity in its shared defaults
 
 gitlab_release:            # F7 — the release object on whichever forge
   enabled: true
@@ -311,14 +314,16 @@ its own environment.
 
 | product | Deliverable | non_release_paths (default) |
 |---|---|---|
-| `image` | container image built from the repo | `CHANGELOG.md`, `README.md`, `docs/**`, `lefthook.yml` — **not** `.gitlab-ci.yml`, which is part of the deliverable |
-| `package` | library / package | `CHANGELOG.md`, `README.md`, `docs/**`, `.gitlab-ci.yml`, `lefthook.yml`, `.gitlab/**` |
+| `image` | container image built from the repo | `CHANGELOG.md`, `README.md`, `docs/**` — **not** `.gitlab-ci.yml`, which is part of the deliverable |
+| `package` | library / package | `CHANGELOG.md`, `README.md`, `docs/**`, `.gitlab-ci.yml`, `.gitlab/**`, `.github/**` |
 | `extension` | extension (e.g. TYPO3 extension, plugin) | same as `package` |
 | `custom` | no derivation; `non_release_paths` is required | — |
 
 Glob semantics: `doublestar` (`**`), repo-relative, evaluated against `git diff --name-only <lastTag>..HEAD`.
 
-The estate uses `lefthook.yml`, not `.pre-commit-config.yaml` — the derived lists name the former.
+Tooling files of one organisation (`lefthook.yml`, `.pre-commit-config.yaml`, editor settings) are
+not defaults; they go into `deliverability.extra_non_release_paths` of that organisation's shared
+defaults file, which the CI component carries.
 Also note the range: the current component compares `CI_COMMIT_BEFORE_SHA..HEAD` (the push range),
 which is why a `fix:` bundled with a CI change never ships today (improvement register I-081).
 Comparing `<lastTag>..HEAD` is the fix, and it is a behaviour change to be measured before rollout.
@@ -617,8 +622,10 @@ KMS, not keyless.
 2. **Mandatory signing:** should `sign: required` be enforced for certain repos (public sector) before the OIDC path exists?
 3. ~~**Release commit at all?**~~ *(resolved: enabled by default)* Without F6, the branch push, GPG and the provenance question disappear entirely; the CHANGELOG then lives only in the GitLab release. Recommendation: keep it switchable per repo (`release_commit.enabled: false`), decide the default.
 4. **Emoji for Chores:** `:wrench:` as replacement for the duplicated `:repeat:` — matter of taste.
-5. **`build` / `revert`.** Both are allowed commit types in this estate's commitlint
-   configuration but appear in no rule list. Proposal: no release for either.
+5. ~~**`build` / `revert`.**~~ *(resolved 2026-09-13)* The binary's default rules are
+   semantic-release's: `revert → patch`, `build` and `chore` release nothing. The estate's
+   `chore → patch` and "revert ships nothing" live in the CI component's defaults file, where
+   every organisation-specific value now lives (OSS review, B2).
 6. **Go coverage threshold.** The estate's stated gate is 75 % line coverage from Cobertura for PHP;
    Go reports through GitLab's `coverage:` regex instead. Pick a number and say whether it blocks.
 7. **Name.** YASRT is honest but unpronounceable.

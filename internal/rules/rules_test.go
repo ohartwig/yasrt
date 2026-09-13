@@ -84,12 +84,16 @@ func TestUnmatchedTypeDoesNotRelease(t *testing.T) {
 	}
 }
 
-// build and revert are allowed commit types in this estate but ship nothing.
-func TestBuildAndRevertDoNotRelease(t *testing.T) {
+// The defaults follow semantic-release's preset: build and chore ship
+// nothing, revert is a patch. An organisation that disagrees says so in its
+// shared defaults; the rules list replaces, it does not merge.
+func TestDefaultRulesMatchSemanticRelease(t *testing.T) {
 	c := cfg(t, "product: image\n")
-	d := Evaluate(commits("build: bump base image", "revert: undo the thing"), c)
-	if d.Bump != semver.None {
-		t.Errorf("Bump = %v, want none", d.Bump)
+	if d := Evaluate(commits("build: bump base image", "chore: tidy"), c); d.Bump != semver.None {
+		t.Errorf("build/chore: Bump = %v, want none", d.Bump)
+	}
+	if d := Evaluate(commits("revert: undo the thing"), c); d.Bump != semver.Patch {
+		t.Errorf("revert: Bump = %v, want patch", d.Bump)
 	}
 }
 
@@ -133,9 +137,13 @@ func TestIgnoreByAuthor(t *testing.T) {
 		t.Errorf("Ignored = %+v", d.Ignored)
 	}
 	// Without the ignore entry the same commit would have released.
-	plain := cfg(t, "product: package\n")
+	plain := cfg(t, "product: package\nrules:\n  - type: chore\n    release: patch\n")
 	if Evaluate(cs[:1], plain).Bump != semver.Patch {
-		t.Error("chore should map to patch by default")
+		t.Error("chore maps to patch when a rule says so")
+	}
+	// By default it does not: that matches semantic-release's preset.
+	if Evaluate(cs[:1], cfg(t, "product: package\n")).Bump != semver.None {
+		t.Error("chore must not release by default")
 	}
 }
 

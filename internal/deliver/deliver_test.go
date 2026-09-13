@@ -8,8 +8,8 @@ import (
 	"testing"
 )
 
-var imagePaths = []string{"CHANGELOG.md", "README.md", "docs/**", "lefthook.yml"}
-var packagePaths = []string{"CHANGELOG.md", "README.md", "docs/**", ".gitlab-ci.yml", "lefthook.yml", ".gitlab/**"}
+var imagePaths = []string{"CHANGELOG.md", "README.md", "docs/**"}
+var packagePaths = []string{"CHANGELOG.md", "README.md", "docs/**", ".gitlab-ci.yml", ".gitlab/**", ".github/**"}
 
 func TestMatches(t *testing.T) {
 	for _, tc := range []struct {

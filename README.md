@@ -75,8 +75,8 @@ format, matching what this estate already does:
 
 | product | non-release paths | tag format |
 |---|---|---|
-| `image` | `CHANGELOG.md`, `README.md`, `docs/**`, `lefthook.yml` — **not** `.gitlab-ci.yml`, which builds the image | `1.2.3` |
-| `package` | the above **plus** `.gitlab-ci.yml`, `.gitlab/**` | `v1.2.3` |
+| `image` | `CHANGELOG.md`, `README.md`, `docs/**` — **not** `.gitlab-ci.yml`, which builds the image | `1.2.3` |
+| `package` | the above **plus** `.gitlab-ci.yml`, `.gitlab/**`, `.github/**` | `v1.2.3` |
 | `extension` | as `package` | `v1.2.3` |
 | `custom` | nothing derived; `non_release_paths` is required | `1.2.3` |
 

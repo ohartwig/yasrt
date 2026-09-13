@@ -92,11 +92,8 @@ func TestNonReleasePathsDerivation(t *testing.T) {
 	if slices.Contains(img, ".gitlab-ci.yml") {
 		t.Error("image: .gitlab-ci.yml builds the deliverable and must stay releasable")
 	}
-	if !slices.Contains(img, "lefthook.yml") {
-		t.Errorf("image: want lefthook.yml, got %q", img)
-	}
-	if slices.Contains(img, ".pre-commit-config.yaml") {
-		t.Error("this estate uses lefthook, not pre-commit")
+	if slices.Contains(img, "lefthook.yml") || slices.Contains(img, ".pre-commit-config.yaml") {
+		t.Errorf("image: tooling files of one organisation are not a default, got %q", img)
 	}
 
 	pkg := load(t, "product: package\n").NonReleasePaths()

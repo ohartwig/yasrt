@@ -15,7 +15,7 @@ import (
 )
 
 // Version is a semantic version. Build metadata is deliberately not modelled:
-// nothing in this estate uses it, and ignoring it keeps comparison total.
+// SemVer ignores it for precedence, and ignoring it keeps comparison total.
 type Version struct {
 	Major, Minor, Patch uint64
 	Pre                 string // without the leading '-'; empty for a release

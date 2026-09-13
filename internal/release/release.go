@@ -133,7 +133,7 @@ func hookContext(res *analyze.Result, notes, projectURL string, dryRun bool) hoo
 }
 
 // forgeKind is the platform the push credentials must suit. GitLab is the
-// fallback because that is what an unconfigured estate is.
+// fallback because that is where this tool started.
 func (o *Options) forgeKind() forge.Kind {
 	if o.Forge != nil {
 		return o.Forge.Kind()
@@ -667,13 +667,18 @@ func expandEnv(s string) string {
 	return os.Expand(s, func(k string) string { return os.Getenv(k) })
 }
 
+// configureIdentity writes the release author into the repository's own
+// config, so that a fresh CI container -- which has no identity at all --
+// can make the tag and the commit. The author is configuration, not
+// environment: release_commit.author has a default, so there is always one.
 func configureIdentity(repo *git.Repo, cfg *config.Config) error {
 	name, email := parseAuthor(cfg.ReleaseCommit.Author)
+	dn, de := parseAuthor(config.DefaultReleaseAuthor)
 	if name == "" {
-		name = firstNonEmpty(os.Getenv("GITLAB_USER_NAME"), "yasrt")
+		name = dn
 	}
 	if email == "" {
-		email = firstNonEmpty(os.Getenv("GITLAB_USER_EMAIL"), "yasrt@localhost")
+		email = de
 	}
 	if err := repo.Config("user.name", name); err != nil {
 		return err
@@ -830,8 +835,8 @@ func decodeKey(v string) (string, error) {
 }
 
 // configureSSHSigning writes the key to a private file and points git at it.
-// GitLab verifies SSH signatures, and the estate already trusts SSH keys for
-// human commits through .gitsigners, so this is the format with a future.
+// GitLab, GitHub and Forgejo all verify SSH signatures, and organisations
+// that already trust SSH keys for human commits need no second key type.
 func configureSSHSigning(repo *git.Repo, key string) (func(), error) {
 	dir, err := os.MkdirTemp("", "yasrt-signing-")
 	if err != nil {

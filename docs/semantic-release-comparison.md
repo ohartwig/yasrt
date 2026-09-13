@@ -42,7 +42,7 @@ available, with the reason · **+** yasrt only.
 | `parserOpts` | — | ✗ Header regex is fixed. No repository in the estate overrides it. |
 | `releaseRules` | `rules[]` with `type`, `scope`, `breaking`, `release` | ≈ Same first-match-wins evaluation. semantic-release can match any commit property (`subject`, `tag`, custom); yasrt matches type, scope and the breaking flag — the three that appear in every `releaseRules` in the estate. |
 | `presetConfig` | — | ✗ Preset concept absent. |
-| default rules | breaking → major, `feat` → minor, `fix`/`perf`/`chore` → patch | ≈ semantic-release's `conventionalcommits` defaults have `revert` → patch and `chore` → nothing. The estate preset had `chore` → patch (Renovate bumps ship), and that is what yasrt inherits; `revert` releases nothing unless a rule says so. Open item T-901. |
+| default rules | breaking → major, `feat` → minor, `fix`/`perf`/`revert` → patch | ✓ Same as the `conventionalcommits` preset. An organisation that ships dependency bumps adds `chore → patch` in its shared defaults; the rules list replaces rather than merges. |
 | — | `ignore.scopes` (always contains `release`) | + Loop guard; not configurable away. |
 | — | `ignore.authors` | + Skip commits by author, e.g. a bot. |
 | — | `ignore.trailers` (`skip release`, `release skip`) | + Per-commit opt-out. |
@@ -72,7 +72,7 @@ available, with the reason · **+** yasrt only.
 | plugin present at all | `release_commit.enabled` (default `true`) | ✓ |
 | `message` | `release_commit.message` (`${version}`, `${tag}`, `${notes}`) | ✓ semantic-release's `${nextRelease.version}` / `${nextRelease.notes}` become the short names. |
 | `assets` | `release_commit.assets` (globs) | ✓ Default `["CHANGELOG.md"]`. |
-| `GIT_AUTHOR_*` / `GIT_COMMITTER_*` | `release_commit.author` (default `KOH Release Bot <release-bot@ole-hartwig.eu>`) | ✓ Configured, not taken from the environment. |
+| `GIT_AUTHOR_*` / `GIT_COMMITTER_*` | `release_commit.author` (default a `yasrt <…@noreply.invalid>` placeholder; organisations set theirs in the shared defaults) | ✓ Configured, not taken from the environment. |
 | — | `release_commit.sign: auto \| required \| off` | + OpenPGP or OpenSSH key from `GPG_SEM_REL_B64`, detected from the material. semantic-release leaves signing to whatever `git` is configured with. |
 | commit **before** tag | tag **before** release commit, tag on the built commit | ≈ Deliberate: a failure after the tag leaves a complete release, and the tag names what was built. |
 

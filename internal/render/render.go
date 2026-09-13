@@ -79,7 +79,7 @@ func Notes(in Input) string {
 }
 
 // entry renders one commit line in the shape conventional-changelog produces,
-// because that is what every CHANGELOG.md in this estate already contains:
+// because that is what a CHANGELOG.md written by semantic-release contains:
 //
 //   - **scope:** description ([abc1234](<url>/-/commit/<sha>))
 //
@@ -149,7 +149,7 @@ func link(kind, number string, urls forge.URLs) string {
 	return fmt.Sprintf("[%s](%s)", text, href)
 }
 
-// ChangelogHeading introduces one release, in the shape the estate's existing
+// ChangelogHeading introduces one release, in the shape existing
 // changelogs use: the version links to the comparison against its predecessor,
 // and the date is parenthesised.
 //
@@ -179,7 +179,7 @@ func PrependChangelog(existing string, in Input, notes string) string {
 	block := headingFor(in.Version, in.Date, in.URLs, in.Previous, in.Tag) +
 		"\n\n" + strings.TrimRight(notes, "\n") + "\n"
 
-	// No document title by default: the estate's changelogs start straight at
+	// No document title by default: changelogs written by semantic-release start at
 	// the first release heading, and adding one would put a line above every
 	// existing file's history at the moment it migrates. A configured title is
 	// added only where none exists; a file that has one keeps it.

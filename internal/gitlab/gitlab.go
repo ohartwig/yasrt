@@ -6,7 +6,7 @@
 //
 // There is no client library here on purpose. Three endpoints do not justify a
 // dependency tree in a tool whose reason for existing is dependency reduction,
-// and the estate's own release jobs already call these endpoints with curl.
+// and release jobs commonly call these endpoints with curl already.
 package gitlab
 
 import (

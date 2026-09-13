@@ -116,6 +116,11 @@ type Versioning struct {
 	// branch cannot leave the range — that is what makes it a maintenance
 	// branch rather than just an old one.
 	Maintenance []string `yaml:"maintenance"`
+	// PreviousTagFormats lists formats earlier releases were tagged with, so a
+	// repository that changes tag_format keeps its history: the old tags are
+	// still recognised as releases, the new format is used for new ones. A
+	// format that is never used to create a tag cannot collide with anything.
+	PreviousTagFormats []string `yaml:"previous_tag_formats"`
 }
 
 // maintenanceRE matches the conventional shapes: 1.x and 1.2.x.
@@ -458,6 +463,11 @@ func (c *Config) validate() error {
 	if !strings.Contains(*c.TagFormat, VersionPlaceholder) {
 		errs = append(errs, fmt.Errorf("tag_format: %q must contain %s", *c.TagFormat, VersionPlaceholder))
 	}
+	for i, f := range c.Versioning.PreviousTagFormats {
+		if !strings.Contains(f, VersionPlaceholder) {
+			errs = append(errs, fmt.Errorf("versioning.previous_tag_formats[%d]: %q must contain %s", i, f, VersionPlaceholder))
+		}
+	}
 	if _, err := semver.Parse(c.Versioning.Initial); err != nil {
 		errs = append(errs, fmt.Errorf("versioning.initial: %w", err))
 	}
@@ -549,9 +559,22 @@ func (c *Config) Tag(v semver.Version) string {
 }
 
 // VersionFromTag is the inverse of Tag. It reports false for any tag that does
-// not match the configured format, which is how foreign tags are ignored.
+// not match the configured format or one of the previous ones, which is how
+// foreign tags are ignored.
 func (c *Config) VersionFromTag(tag string) (semver.Version, bool) {
-	prefix, suffix, _ := strings.Cut(*c.TagFormat, VersionPlaceholder)
+	if v, ok := versionFromTag(*c.TagFormat, tag); ok {
+		return v, true
+	}
+	for _, f := range c.Versioning.PreviousTagFormats {
+		if v, ok := versionFromTag(f, tag); ok {
+			return v, true
+		}
+	}
+	return semver.Version{}, false
+}
+
+func versionFromTag(format, tag string) (semver.Version, bool) {
+	prefix, suffix, _ := strings.Cut(format, VersionPlaceholder)
 	rest, ok := strings.CutPrefix(tag, prefix)
 	if !ok {
 		return semver.Version{}, false

@@ -593,3 +593,23 @@ func TestMaintenanceBranches(t *testing.T) {
 		}
 	})
 }
+
+// Switching tag_format must not restart the version series: the old tags are
+// still releases, only new tags take the new shape.
+func TestTagFormatChangeKeepsTheHistory(t *testing.T) {
+	tr := testrepo.New(t)
+	tr.CommitFile("src/main.go", "1", "feat: first")
+	tr.Tag("1.6.1")
+	tr.CommitFile("src/b.go", "2", "feat: after the switch")
+
+	res := run(t, tr, cfg(t, "product: custom\ntag_format: \"v${version}\"\ndeliverability:\n  non_release_paths: [docs/**]\nversioning:\n  previous_tag_formats: [\"${version}\"]\n"), analyze.Options{})
+	if res.Status != analyze.StatusRelease || res.Version.String() != "1.7.0" || res.Tag != "v1.7.0" || res.Previous != "1.6.1" {
+		t.Errorf("got status=%s version=%s tag=%s previous=%s; want release 1.7.0 v1.7.0 from 1.6.1", res.Status, res.Version, res.Tag, res.Previous)
+	}
+
+	// Without the previous format the history is invisible and the series restarts.
+	res = run(t, tr, cfg(t, "product: custom\ntag_format: \"v${version}\"\ndeliverability:\n  non_release_paths: [docs/**]\n"), analyze.Options{})
+	if res.Version.String() != "1.0.0" {
+		t.Errorf("without previous_tag_formats the old tag must be foreign; got %s", res.Version)
+	}
+}

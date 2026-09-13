@@ -1,4 +1,4 @@
-# yasrt releases yasrt. See docs/plan.md, phase P6.
+# yasrt releases yasrt. See docs/design/plan.md, phase P6.
 version: 1
 
 # custom rather than image: this repository ships a binary to the package

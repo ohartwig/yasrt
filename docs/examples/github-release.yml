@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
+# SPDX-License-Identifier: MIT
+#
+# .github/workflows/release.yml -- releasing with yasrt on GitHub Actions.
+# The same file runs on Forgejo Actions with FORGEJO_TOKEN in place of
+# GITHUB_TOKEN. A push made with the workflow's token starts no workflow, so
+# the changelog commit does not release itself.
+
+name: release
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # yasrt needs the full history
+
+      - name: install yasrt
+        run: |
+          curl -fsSL -o yasrt "https://git.ole-hartwig.eu/yasrt/cli/-/releases/permalink/latest/downloads/yasrt-linux-amd64"
+          chmod +x yasrt
+
+      - name: decide
+        run: ./yasrt next --output .release.env
+
+      - name: build
+        run: |
+          . ./.release.env
+          [ "$RELEASE_STATUS" = "release" ] || { echo "nothing to release: $RELEASE_STATUS"; exit 0; }
+          make build VERSION="$RELEASE_VERSION"
+
+      - name: release
+        run: ./yasrt release --input .release.env --report release-report.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

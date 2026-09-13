@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
+# SPDX-License-Identifier: MIT
+#
+# A complete GitLab CI pipeline releasing with yasrt, without the CI/CD
+# component: decide, build, release -- the tag only after the build passed.
+#
+# Requirements on the project: "Allow Git push requests to the repository"
+# (Settings > CI/CD > Job token permissions), and whoever may merge to the
+# default branch may create tags matching the tag format. `yasrt check`
+# reports both.
+
+stages: [version, build, release]
+
+variables:
+  GIT_DEPTH: 0 # yasrt needs the full history to find the last release
+
+default:
+  image:
+    name: registry.ole-hartwig.eu/devops/images/yasrt:1
+    entrypoint: [""]
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+
+version:
+  stage: version
+  script:
+    - yasrt check
+    - yasrt next --output .release.env
+  artifacts:
+    reports:
+      dotenv: .release.env
+
+build:
+  stage: build
+  image: golang:1.27
+  script:
+    # rules: are evaluated before .release.env exists, so the gate is here.
+    - '[ "$RELEASE_STATUS" = "release" ] || { echo "nothing to release: $RELEASE_STATUS"; exit 0; }'
+    - go build -ldflags "-X main.version=$RELEASE_VERSION" -o dist/app ./cmd/app
+  artifacts:
+    paths: [dist/]
+
+release:
+  stage: release
+  needs: [version, build]
+  resource_group: release
+  script:
+    - '[ "$RELEASE_STATUS" = "release" ] || exit 0'
+    - yasrt release --report release-report.json
+  artifacts:
+    paths: [release-report.json]
+    when: always

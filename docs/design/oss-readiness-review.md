@@ -53,11 +53,11 @@ none; `CHANGELOG.md`, `README.md`, `docs/**` only; semantic-release's default
 rules), and the estate's values move into the layered defaults file the CI
 component already ships — that mechanism exists precisely for this. Rewrite
 the comments to state the reason without the estate reference; where the
-history matters, point at `docs/plan.md`.
+history matters, point at `docs/design/plan.md`.
 
 ### B3 — Documentation written for insiders
 
-- `docs/SPEC.md`, `docs/plan.md`, `docs/tasks.md` reference improvement items,
+- `docs/SPEC.md`, `docs/design/plan.md`, `docs/design/tasks.md` reference improvement items,
   risk ids, ~40 internal project paths and pilot findings. They are the
   design record and worth keeping — but not as the front door.
 - `SECURITY.md` is the estate's policy: its scope lists `devops/**` and

@@ -4,7 +4,7 @@
 # this is a starting position rather than an inherited convention: the default
 # linters, plus the few that catch the mistakes this codebase can actually
 # make — unchecked errors around git and HTTP, and shadowed error values.
-# See docs/plan.md risk R7 before promoting it to the shared Go component.
+# See docs/design/plan.md risk R7 before promoting it to the shared Go component.
 
 version: "2"
 

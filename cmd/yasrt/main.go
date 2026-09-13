@@ -15,6 +15,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 
 	"github.com/ohartwig/yasrt/internal/analyze"
@@ -24,7 +25,19 @@ import (
 )
 
 // version is injected at build time with -ldflags "-X main.version=...".
+// A binary built by `go install module@vX.Y.Z` gets no ldflags; it reports
+// the module version Go recorded instead.
 var version = "dev"
+
+func versionString() string {
+	if version != "dev" {
+		return version
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+		return strings.TrimPrefix(bi.Main.Version, "v")
+	}
+	return version
+}
 
 // Exit codes are a public interface: consumer pipelines switch on them.
 const (
@@ -66,7 +79,7 @@ func run(args []string) int {
 	case "check":
 		return classify(cmdCheck(rest))
 	case "version":
-		fmt.Println(version)
+		fmt.Println(versionString())
 		return exitOK
 	case "-h", "--help", "help":
 		fmt.Print(usage)

@@ -136,11 +136,21 @@ type Result struct {
 // ErrHookFailed marks a failure that must stop the release.
 var ErrHookFailed = errors.New("hook failed")
 
+// Masker removes secrets from text before it is recorded. Hooks inherit the
+// job's environment by design -- a hook that needs a token reads it there --
+// so anything a hook prints may contain one, and its output ends up in the
+// release report, which is a job artefact.
+type Masker func(string) string
+
 // Run executes the hooks configured for one event, in order. It stops at the
-// first fatal failure and returns what ran up to that point.
-func Run(ctx context.Context, dir string, event Event, hs []Hook, c Context, log *slog.Logger) ([]Result, error) {
+// first fatal failure and returns what ran up to that point. mask is applied
+// to every hook's captured output; nil records output verbatim.
+func Run(ctx context.Context, dir string, event Event, hs []Hook, c Context, mask Masker, log *slog.Logger) ([]Result, error) {
 	if len(hs) == 0 {
 		return nil, nil
+	}
+	if mask == nil {
+		mask = func(s string) string { return s }
 	}
 	c.Event = string(event)
 	payload, err := json.Marshal(c)
@@ -150,7 +160,7 @@ func Run(ctx context.Context, dir string, event Event, hs []Hook, c Context, log
 
 	var results []Result
 	for _, h := range hs {
-		res, err := runOne(ctx, dir, event, h, payload, c, log)
+		res, err := runOne(ctx, dir, event, h, payload, c, mask, log)
 		results = append(results, res)
 		if err != nil {
 			return results, err
@@ -159,7 +169,7 @@ func Run(ctx context.Context, dir string, event Event, hs []Hook, c Context, log
 	return results, nil
 }
 
-func runOne(ctx context.Context, dir string, event Event, h Hook, payload []byte, c Context, log *slog.Logger) (Result, error) {
+func runOne(ctx context.Context, dir string, event Event, h Hook, payload []byte, c Context, mask Masker, log *slog.Logger) (Result, error) {
 	res := Result{Name: h.label(), Event: string(event)}
 
 	timeout, err := h.timeout()
@@ -183,7 +193,7 @@ func runOne(ctx context.Context, dir string, event Event, h Hook, payload []byte
 	start := time.Now()
 	runErr := cmd.Run()
 	res.Duration = time.Since(start).Round(time.Millisecond).String()
-	res.Output = strings.TrimRight(out.String(), "\n")
+	res.Output = mask(strings.TrimRight(out.String(), "\n"))
 	res.ExitCode = cmd.ProcessState.ExitCode()
 
 	if runErr == nil {
@@ -194,7 +204,7 @@ func runOne(ctx context.Context, dir string, event Event, h Hook, payload []byte
 		return res, nil
 	}
 
-	res.Error = runErr.Error()
+	res.Error = mask(runErr.Error())
 	if errors.Is(runCtx.Err(), context.DeadlineExceeded) {
 		res.Error = fmt.Sprintf("timed out after %s", timeout)
 	}

@@ -173,7 +173,7 @@ func Run(ctx context.Context, o Options) (*Report, error) {
 	hctx := hookContext(o.Result, rep.Notes, o.URLs.Base, o.DryRun)
 	hctx.Error = err.Error()
 	hctx.FailedStep = rep.failedStep()
-	hres, hookErr := hooks.Run(ctx, o.Repo.Dir(), hooks.OnFailure, hs, hctx, log)
+	hres, hookErr := hooks.Run(ctx, o.Repo.Dir(), hooks.OnFailure, hs, hctx, o.Repo.Mask, log)
 	rep.Hooks = append(rep.Hooks, hres...)
 	if hookErr != nil {
 		log.Warn("on_failure hook failed too", "err", hookErr)
@@ -200,6 +200,9 @@ func run(ctx context.Context, o Options, log *slog.Logger) (*Report, error) {
 	}
 	if o.Token != "" {
 		repo.AddSecret(o.Token)
+	}
+	if k := strings.TrimSpace(o.GPGKeyB64); k != "" {
+		repo.AddSecret(k)
 	}
 
 	// Idempotency anchor first: what the remote already knows about this tag
@@ -274,7 +277,7 @@ func run(ctx context.Context, o Options, log *slog.Logger) (*Report, error) {
 
 	// before_tag runs while nothing has been written yet, so a hook that says
 	// no leaves the repository exactly as it found it.
-	hres, hookErr := hooks.Run(ctx, repo.Dir(), hooks.BeforeTag, cfg.Hooks.For(hooks.BeforeTag), hctx, log)
+	hres, hookErr := hooks.Run(ctx, repo.Dir(), hooks.BeforeTag, cfg.Hooks.For(hooks.BeforeTag), hctx, repo.Mask, log)
 	rep.Hooks = append(rep.Hooks, hres...)
 	if hookErr != nil {
 		rep.Steps = append(rep.Steps, Step{Name: "hook:before_tag", Status: StepFailed, Detail: hookErr.Error()})
@@ -340,7 +343,7 @@ func run(ctx context.Context, o Options, log *slog.Logger) (*Report, error) {
 		log.Info("tag pushed", "tag", res.Tag, "commit", short(res.Commit))
 	}
 
-	hres, hookErr = hooks.Run(ctx, repo.Dir(), hooks.AfterTag, cfg.Hooks.For(hooks.AfterTag), hctx, log)
+	hres, hookErr = hooks.Run(ctx, repo.Dir(), hooks.AfterTag, cfg.Hooks.For(hooks.AfterTag), hctx, repo.Mask, log)
 	rep.Hooks = append(rep.Hooks, hres...)
 	if hookErr != nil {
 		rep.Steps = append(rep.Steps, Step{Name: "hook:after_tag", Status: StepFailed, Detail: hookErr.Error()})
@@ -382,7 +385,7 @@ func run(ctx context.Context, o Options, log *slog.Logger) (*Report, error) {
 
 	// Step 7: after_release hooks. The release has already happened, so a
 	// failure here is reported rather than fatal, unless a hook opts in.
-	hres, hookErr = hooks.Run(ctx, repo.Dir(), hooks.AfterRelease, cfg.Hooks.For(hooks.AfterRelease), hctx, log)
+	hres, hookErr = hooks.Run(ctx, repo.Dir(), hooks.AfterRelease, cfg.Hooks.For(hooks.AfterRelease), hctx, repo.Mask, log)
 	rep.Hooks = append(rep.Hooks, hres...)
 	if len(hres) > 0 {
 		st := StepDone

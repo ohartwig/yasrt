@@ -108,7 +108,7 @@ func cmdNext(args []string) error {
 			Commit:   res.Commit,
 			Breaking: res.Decision.Breaking(),
 		}
-		if _, err := hooks.Run(context.Background(), repo.Dir(), hooks.AfterAnalysis, hs, hctx, log); err != nil {
+		if _, err := hooks.Run(context.Background(), repo.Dir(), hooks.AfterAnalysis, hs, hctx, repo.Mask, log); err != nil {
 			return err
 		}
 	}

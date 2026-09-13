@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.8.0](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.7.1...v1.8.0) (2026-09-13)
+
+### :sparkles: Features
+
+* module path github.com/ohartwig/yasrt ([861679b](https://git.ole-hartwig.eu/yasrt/cli/commit/861679bba0dc7fdc5828877438911b77ebfd0f74))
+
+### :memo: Documentation
+
+* **examples:** pin actions/checkout to a commit ([609a00d](https://git.ole-hartwig.eu/yasrt/cli/commit/609a00d1484f11b6fff0641dbae90fb54b122a30))
+* single blank line after the plan's preface ([cc69ce0](https://git.ole-hartwig.eu/yasrt/cli/commit/cc69ce043d4f9b7b89f35cfd7185209d0946ccd9))
+* a front door for readers who do not know this estate ([44d2d3f](https://git.ole-hartwig.eu/yasrt/cli/commit/44d2d3ffe564fcd852458f2b5c882b19879baab1))
+
 ## [1.7.1](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.7.0...v1.7.1) (2026-09-13)
 
 ### :zap: Refactor

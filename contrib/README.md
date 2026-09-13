@@ -12,7 +12,7 @@ lives outside, as a script a pipeline runs after `release`.
 
 | Script | What it does | Needs |
 |---|---|---|
-| `gitlab-release-comments.py` | Notes on every merge request and closed issue of a release: ":tada: This MR is included in version x.y.z" -- what semantic-release/gitlab's `success` step did | python3, a token that may write notes (`GITLAB_TOKEN`) |
+| `gitlab-release-comments.py` | Notes on every merge request of a release (":tada: This MR is included in version x.y.z") and on every issue those close or the commits name (":tada: This issue has been resolved in version x.y.z") -- what semantic-release/gitlab's `success` step did. Closing stays GitLab's job at merge time | python3, a token that may write notes (`GITLAB_TOKEN`) |
 
 ## Why a script and not a feature
 

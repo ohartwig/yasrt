@@ -12,9 +12,11 @@ may write notes, and posts the familiar note:
 
 It reads `release-report.json` (what `yasrt release` wrote) and the
 `.release.env` handshake from the environment, asks GitLab which merge
-requests each commit of the release belongs to and which issues those close --
-the same association the old chain used, rather than parsing messages for
-references -- and notes each of them once.
+requests each commit of the release belongs to and which issues those close,
+adds the issues the commit messages name (#12, Closes #12, the issue URL --
+what semantic-release's issue-parser read), and notes each of them once.
+Closing issues is GitLab's job at merge time, not the release's; the note
+says which version carries the fix.
 
 Environment: CI_API_V4_URL, CI_PROJECT_ID, CI_PROJECT_URL (GitLab's own),
 RELEASE_STATUS and RELEASE_PREVIOUS (from `yasrt next`), and the token in the
@@ -34,16 +36,25 @@ Usage in .gitlab-ci.yml (the release-tools/yasrt component wires this as
 """
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 
 NOTE = (
-    ":tada: This {kind} is included in version {version} :tada:\n\n"
+    ":tada: This {what} version {version} :tada:\n\n"
     "The release is available on [GitLab release]({url})\n\n"
     "Your **yasrt** release :package::rocket:"
 )
+MR_WHAT = "MR is included in"
+ISSUE_WHAT = "issue has been resolved in"
+
+# Issue references in a commit message, the way semantic-release's
+# issue-parser read them: #12, Closes #12, or the issue's own URL. Closing is
+# not this script's business -- GitLab closes an issue when the merge request
+# that names it merges -- only telling it which version carries the fix is.
+ISSUE_REF = re.compile(r"(?<![\w/])#(\d+)\b")
 
 
 def main() -> int:
@@ -95,12 +106,22 @@ def main() -> int:
             for i in call(f"merge_requests/{iid}/closes_issues"):
                 if str(i.get("project_id")) == pid:
                     issues[i["iid"]] = i
+        issue_url = f"{os.environ.get('CI_PROJECT_URL', '')}/-/issues/"
+        for c in commits:
+            text = c.get("message") or c.get("title", "")
+            for ref in ISSUE_REF.findall(text) + [u[len(issue_url):] for u in re.findall(re.escape(issue_url) + r"\d+", text)]:
+                issues.setdefault(int(ref), None)
         for iid in sorted(mrs):
-            call(f"merge_requests/{iid}/notes", {"body": NOTE.format(kind="MR", version=version, url=url)})
+            call(f"merge_requests/{iid}/notes", {"body": NOTE.format(what=MR_WHAT, version=version, url=url)})
             print(f"noted !{iid}")
         for iid in sorted(issues):
-            call(f"issues/{iid}/notes", {"body": NOTE.format(kind="issue", version=version, url=url)})
-            print(f"noted #{iid}")
+            try:
+                call(f"issues/{iid}/notes", {"body": NOTE.format(what=ISSUE_WHAT, version=version, url=url)})
+                print(f"noted #{iid}")
+            except urllib.error.HTTPError as e:
+                if e.code != 404:
+                    raise
+                print(f"#{iid} named in a commit but not an issue here -- skipped")
     except urllib.error.HTTPError as e:
         print(f"GitLab answered {e.code} on {e.url}: {e.read()[:200]!r} -- the release stands, the notes do not")
         return 0

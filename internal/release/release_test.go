@@ -371,6 +371,28 @@ after_release:
 	}
 }
 
+// A repository whose build and publish run on the tag pipeline keeps that
+// shape by triggering itself on the tag it just cut: project and ref expand
+// like the variables do.
+func TestTriggerProjectAndRefExpand(t *testing.T) {
+	t.Setenv("CI_PROJECT_PATH", "devops/wolfi-packages")
+	s := setup(t, `
+product: image
+after_release:
+  triggers:
+    - project: "${CI_PROJECT_PATH}"
+      ref: "${tag}"
+`)
+	rep := run(t, s.opts())
+	if len(rep.Triggers) != 1 {
+		t.Fatalf("report triggers = %+v", rep.Triggers)
+	}
+	tr := rep.Triggers[0]
+	if tr.Project != "devops/wolfi-packages" || tr.Ref != rep.Tag || tr.Pipeline == "" || tr.Error != "" {
+		t.Errorf("trigger = %+v, want project devops/wolfi-packages ref %s", tr, rep.Tag)
+	}
+}
+
 func TestTriggerFailureDoesNotFailTheRelease(t *testing.T) {
 	s := setup(t, `
 product: image

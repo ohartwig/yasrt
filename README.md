@@ -121,6 +121,13 @@ merge to the default branch must be allowed to create the release tag —
 `yasrt check` verifies both. A push made with the job token starts no pipeline,
 which is what keeps the release commit from releasing again.
 
+A repository whose publishing has to run *on the tag* — say, because a signing
+role's OIDC trust is scoped to `ref_type:tag` — keeps that pipeline by having
+the release start it: `after_release.triggers` expands `${tag}`, `${version}`
+and CI variables in `project`, `ref` and `variables`, so
+`{ project: "${CI_PROJECT_PATH}", ref: "${tag}" }` runs the tag pipeline the
+job-token push did not.
+
 A CI/CD component with this shape (`version`, `release`, a shared defaults
 layer, `product` and `tag-format` as inputs) lives in
 `devops/ci-cd-components/release-tools` on the same instance:

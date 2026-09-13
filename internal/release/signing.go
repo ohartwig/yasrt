@@ -13,8 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"git.ole-hartwig.eu/yasrt/cli/internal/config"
-	"git.ole-hartwig.eu/yasrt/cli/internal/git"
+	"github.com/ohartwig/yasrt/internal/config"
+	"github.com/ohartwig/yasrt/internal/git"
 )
 
 // Signing key formats. Which one a key is gets detected from the material

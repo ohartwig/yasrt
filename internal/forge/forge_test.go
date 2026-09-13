@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"git.ole-hartwig.eu/yasrt/cli/internal/forge"
+	"github.com/ohartwig/yasrt/internal/forge"
 )
 
 func envOf(m map[string]string) forge.Getenv {

@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"git.ole-hartwig.eu/yasrt/cli/internal/hooks"
+	"github.com/ohartwig/yasrt/internal/hooks"
 )
 
 var discard = slog.New(slog.NewTextHandler(io.Discard, nil))

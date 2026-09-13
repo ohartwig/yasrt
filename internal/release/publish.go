@@ -13,9 +13,9 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 
-	"git.ole-hartwig.eu/yasrt/cli/internal/analyze"
-	"git.ole-hartwig.eu/yasrt/cli/internal/config"
-	"git.ole-hartwig.eu/yasrt/cli/internal/forge"
+	"github.com/ohartwig/yasrt/internal/analyze"
+	"github.com/ohartwig/yasrt/internal/config"
+	"github.com/ohartwig/yasrt/internal/forge"
 )
 
 func publishRelease(ctx context.Context, o Options, cfg *config.Config, res *analyze.Result,

@@ -11,12 +11,12 @@ import (
 	"os"
 	"strings"
 
-	"git.ole-hartwig.eu/yasrt/cli/internal/config"
-	"git.ole-hartwig.eu/yasrt/cli/internal/deliver"
-	"git.ole-hartwig.eu/yasrt/cli/internal/forge"
-	"git.ole-hartwig.eu/yasrt/cli/internal/git"
-	"git.ole-hartwig.eu/yasrt/cli/internal/gitlabprobe"
-	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
+	"github.com/ohartwig/yasrt/internal/config"
+	"github.com/ohartwig/yasrt/internal/deliver"
+	"github.com/ohartwig/yasrt/internal/forge"
+	"github.com/ohartwig/yasrt/internal/git"
+	"github.com/ohartwig/yasrt/internal/gitlabprobe"
+	"github.com/ohartwig/yasrt/internal/semver"
 )
 
 // checkRef is the throwaway ref used to prove that pushing works. It is deleted

@@ -15,12 +15,12 @@ import (
 	"strconv"
 	"strings"
 
-	"git.ole-hartwig.eu/yasrt/cli/internal/config"
-	"git.ole-hartwig.eu/yasrt/cli/internal/conventional"
-	"git.ole-hartwig.eu/yasrt/cli/internal/deliver"
-	"git.ole-hartwig.eu/yasrt/cli/internal/git"
-	"git.ole-hartwig.eu/yasrt/cli/internal/rules"
-	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
+	"github.com/ohartwig/yasrt/internal/config"
+	"github.com/ohartwig/yasrt/internal/conventional"
+	"github.com/ohartwig/yasrt/internal/deliver"
+	"github.com/ohartwig/yasrt/internal/git"
+	"github.com/ohartwig/yasrt/internal/rules"
+	"github.com/ohartwig/yasrt/internal/semver"
 )
 
 // Status is the outcome of an analysis. Every run produces exactly one.

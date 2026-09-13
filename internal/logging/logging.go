@@ -12,7 +12,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"git.ole-hartwig.eu/yasrt/cli/internal/git"
+	"github.com/ohartwig/yasrt/internal/git"
 )
 
 // Format selects the output shape.

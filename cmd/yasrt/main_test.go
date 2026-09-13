@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"git.ole-hartwig.eu/yasrt/cli/internal/output"
-	"git.ole-hartwig.eu/yasrt/cli/internal/testrepo"
+	"github.com/ohartwig/yasrt/internal/output"
+	"github.com/ohartwig/yasrt/internal/testrepo"
 )
 
 // fixture builds a repository with a config file and returns paths for --dir

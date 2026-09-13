@@ -46,7 +46,7 @@ Windows is not.
 **Go.**
 
 ```sh
-go install git.ole-hartwig.eu/yasrt/cli/cmd/yasrt@latest   # or a version: @v1.7.0
+go install github.com/ohartwig/yasrt/cmd/yasrt@latest   # or a version: @v1.8.0
 ```
 
 **Container.** `registry.ole-hartwig.eu/devops/images/yasrt:1` is the image the
@@ -271,6 +271,13 @@ Delete `.yasrt.yaml` and the CI jobs. yasrt holds no state of its own:
 everything it produces is a tag, a commit, a release on the forge and a job
 artefact. On GitLab, disable the job-token push setting afterwards if nothing
 else needs it.
+
+## Where this lives
+
+The canonical public home is <https://github.com/ohartwig/yasrt>; that is the
+module path and where tags and releases appear. Development and the release
+pipeline run on the author's GitLab, which mirrors here — merge requests there,
+issues and pull requests here are both read.
 
 ## License
 

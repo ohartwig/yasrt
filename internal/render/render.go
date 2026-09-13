@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"git.ole-hartwig.eu/yasrt/cli/internal/config"
-	"git.ole-hartwig.eu/yasrt/cli/internal/conventional"
-	"git.ole-hartwig.eu/yasrt/cli/internal/forge"
-	"git.ole-hartwig.eu/yasrt/cli/internal/rules"
-	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
+	"github.com/ohartwig/yasrt/internal/config"
+	"github.com/ohartwig/yasrt/internal/conventional"
+	"github.com/ohartwig/yasrt/internal/forge"
+	"github.com/ohartwig/yasrt/internal/rules"
+	"github.com/ohartwig/yasrt/internal/semver"
 )
 
 // BreakingTitle heads the block that precedes every other section, because a

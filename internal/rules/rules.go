@@ -13,9 +13,9 @@ package rules
 import (
 	"strings"
 
-	"git.ole-hartwig.eu/yasrt/cli/internal/config"
-	"git.ole-hartwig.eu/yasrt/cli/internal/conventional"
-	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
+	"github.com/ohartwig/yasrt/internal/config"
+	"github.com/ohartwig/yasrt/internal/conventional"
+	"github.com/ohartwig/yasrt/internal/semver"
 )
 
 // IgnoreReason says why a commit was excluded, for the debug log.

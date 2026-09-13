@@ -16,8 +16,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"git.ole-hartwig.eu/yasrt/cli/internal/forge"
-	"git.ole-hartwig.eu/yasrt/cli/internal/release"
+	"github.com/ohartwig/yasrt/internal/forge"
+	"github.com/ohartwig/yasrt/internal/release"
 )
 
 // fakeGitHubish serves the release endpoints that GitHub and Forgejo share.

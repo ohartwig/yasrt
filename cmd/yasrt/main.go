@@ -17,10 +17,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"git.ole-hartwig.eu/yasrt/cli/internal/analyze"
-	"git.ole-hartwig.eu/yasrt/cli/internal/config"
-	"git.ole-hartwig.eu/yasrt/cli/internal/logging"
-	"git.ole-hartwig.eu/yasrt/cli/internal/release"
+	"github.com/ohartwig/yasrt/internal/analyze"
+	"github.com/ohartwig/yasrt/internal/config"
+	"github.com/ohartwig/yasrt/internal/logging"
+	"github.com/ohartwig/yasrt/internal/release"
 )
 
 // version is injected at build time with -ldflags "-X main.version=...".

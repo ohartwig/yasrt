@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.9.0](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.8.2...v1.9.0) (2026-09-13)
+
+### :sparkles: Features
+
+* **release:** trigger project and ref expand like the variables ([72e64b8](https://git.ole-hartwig.eu/yasrt/cli/commit/72e64b81175488fa97cf14ae57e7bf8cce812227))
+
+### :bug: Fixes
+
+* **rules:** the loop guard is the release commit, not the scope ([1ce698c](https://git.ole-hartwig.eu/yasrt/cli/commit/1ce698c6a9a0ae8f16c0dfc2220f81d0390fa4b3))
+
 ## [1.8.2](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.8.1...v1.8.2) (2026-09-13)
 
 ### :repeat: Continuous Integrations

@@ -227,9 +227,16 @@ mirror:github:
       cd /tmp/mirror
       git filter-repo --quiet --invert-paths \
         --path CLAUDE.md --path .gitsigners --path .gitsigners.d --path .gitlab/
-      # Only the default branch and the release tags go public.
-      git for-each-ref --format='%(refname)' refs/heads | grep -vx "refs/heads/${CI_DEFAULT_BRANCH}" | xargs -r -n1 git update-ref -d
-      git for-each-ref --format='%(refname)' refs/tags | grep -v '^refs/tags/v' | xargs -r -n1 git update-ref -d
-      git push --quiet --force --prune "https://x-access-token:${GITHUB_MIRROR_TOKEN}@github.com/ohartwig/yasrt.git" \
+      # Only the default branch and the release tags go public. A loop rather
+      # than grep | xargs: grep exits 1 when nothing matches, and under set -e
+      # in BusyBox sh that ended the job with nothing to say.
+      git for-each-ref --format='%(refname)' refs/heads refs/tags | while read -r ref; do
+        case "$ref" in
+          "refs/heads/${CI_DEFAULT_BRANCH}"|refs/tags/v*) ;;
+          *) git update-ref -d "$ref" ;;
+        esac
+      done
+      echo "publishing $(git rev-parse --short "${CI_DEFAULT_BRANCH}") and tags: $(git tag | tr '\n' ' ')"
+      git push --force --prune "https://x-access-token:${GITHUB_MIRROR_TOKEN}@github.com/ohartwig/yasrt.git" \
         "refs/heads/${CI_DEFAULT_BRANCH}:refs/heads/${CI_DEFAULT_BRANCH}" 'refs/tags/*:refs/tags/*'
-      echo "mirrored $(git rev-parse --short "${CI_DEFAULT_BRANCH}") and $(git tag | wc -l) tag(s) to github.com/ohartwig/yasrt"
+      echo "mirrored to github.com/ohartwig/yasrt"

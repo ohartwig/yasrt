@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.9.1](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.9.0...v1.9.1) (2026-09-13)
+
+### :bug: Fixes
+
+* **forge:** the pipeline trigger carries the job token in its body ([940fca4](https://git.ole-hartwig.eu/yasrt/cli/commit/940fca4ebcaee9e9c1c0f006d8033e62dfea1d33))
+
+### :memo: Documentation
+
+* **tasks:** cut-over, publication and the tag-pipeline finding ([6a80fdd](https://git.ole-hartwig.eu/yasrt/cli/commit/6a80fdd80b80e439842cfcee33569c3fbbf23f29))
+
 ## [1.9.0](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.8.2...v1.9.0) (2026-09-13)
 
 ### :sparkles: Features

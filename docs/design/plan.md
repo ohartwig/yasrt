@@ -6,7 +6,6 @@
 > things are the way they are. What the tool does today is in
 > [`../SPEC.md`](../SPEC.md); how to use it is in the README.
 
-
 Companion to [`SPEC.md`](SPEC.md). The specification says *what* the tool does; this document says
 *how it gets built, in what order, and what it collides with*. Task-level detail lives in
 [`tasks.md`](tasks.md).

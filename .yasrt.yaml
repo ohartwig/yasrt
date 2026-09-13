@@ -22,6 +22,7 @@ deliverability:
     - docs/**
     - lefthook.yml
     - .gitlab/**
+    - .github/**
 
 release_commit:
   enabled: true

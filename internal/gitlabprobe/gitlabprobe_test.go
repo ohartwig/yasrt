@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
 // SPDX-License-Identifier: MIT
 
-package gitlab_test
+package gitlabprobe_test
 
 import (
 	"context"
@@ -14,14 +14,14 @@ import (
 	"testing"
 	"time"
 
-	"git.ole-hartwig.eu/yasrt/cli/internal/gitlab"
+	"git.ole-hartwig.eu/yasrt/cli/internal/gitlabprobe"
 )
 
-func newServer(t *testing.T, h http.HandlerFunc) (*gitlab.Client, *httptest.Server) {
+func newServer(t *testing.T, h http.HandlerFunc) (*gitlabprobe.Client, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	c := gitlab.New(srv.URL+"/api/v4", "42", "job-token-value")
+	c := gitlabprobe.New(srv.URL+"/api/v4", "42", "job-token-value")
 	c.Backoff = time.Millisecond
 	return c, srv
 }
@@ -54,7 +54,7 @@ func TestDoesNotRetryClientErrors(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error")
 	}
-	var apiErr *gitlab.APIError
+	var apiErr *gitlabprobe.APIError
 	if !errors.As(err, &apiErr) || apiErr.Status != http.StatusForbidden {
 		t.Fatalf("err = %v", err)
 	}
@@ -107,7 +107,7 @@ func TestProtectedBranchAndTagReads(t *testing.T) {
 		t.Fatalf("bs=%+v err=%v", bs, err)
 	}
 	b := bs[0]
-	if got := b.LowestMergeLevel(); got != gitlab.AccessMaintainer {
+	if got := b.LowestMergeLevel(); got != gitlabprobe.AccessMaintainer {
 		t.Errorf("merge level = %v", got)
 	}
 	if got := b.LowestMergeLevel().String(); got != "Maintainer" {
@@ -118,15 +118,15 @@ func TestProtectedBranchAndTagReads(t *testing.T) {
 	if err != nil || len(tags) != 2 {
 		t.Fatalf("tags=%+v err=%v", tags, err)
 	}
-	if got := tags[1].LowestCreateLevel(); got != gitlab.AccessDeveloper {
+	if got := tags[1].LowestCreateLevel(); got != gitlabprobe.AccessDeveloper {
 		t.Errorf("create level = %v", got)
 	}
 }
 
 func TestAccessLevelNames(t *testing.T) {
-	for lvl, want := range map[gitlab.AccessLevel]string{
-		gitlab.AccessNoOne: "no one", gitlab.AccessDeveloper: "Developer",
-		gitlab.AccessMaintainer: "Maintainer", gitlab.AccessOwner: "Owner",
+	for lvl, want := range map[gitlabprobe.AccessLevel]string{
+		gitlabprobe.AccessNoOne: "no one", gitlabprobe.AccessDeveloper: "Developer",
+		gitlabprobe.AccessMaintainer: "Maintainer", gitlabprobe.AccessOwner: "Owner",
 	} {
 		if got := lvl.String(); got != want {
 			t.Errorf("%d = %q, want %q", int(lvl), got, want)

@@ -75,9 +75,8 @@ func (r *rest) doWithCheck(ctx context.Context, method, path string, body, out a
 			return nil
 		}
 		last = err
-		var apiErr *APIError
 		retryable := true
-		if errors.As(err, &apiErr) {
+		if apiErr, ok := errors.AsType[*APIError](err); ok {
 			retryable = apiErr.Retryable()
 		}
 		if !retryable || attempt == tries {
@@ -202,8 +201,8 @@ func openUpload(up Upload) (*os.File, int64, error) {
 }
 
 func notFound(err error) bool {
-	var apiErr *APIError
-	return errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound
+	apiErr, ok := errors.AsType[*APIError](err)
+	return ok && apiErr.Status == http.StatusNotFound
 }
 
 // ---------- GitLab ----------

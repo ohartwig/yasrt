@@ -413,8 +413,7 @@ func (r *Repo) HasStagedChanges() (bool, error) {
 	if err == nil {
 		return false, nil
 	}
-	var ee *exec.ExitError
-	if errors.As(err, &ee) || strings.Contains(err.Error(), "exit status 1") {
+	if _, ok := errors.AsType[*exec.ExitError](err); ok || strings.Contains(err.Error(), "exit status 1") {
 		return true, nil
 	}
 	return false, err

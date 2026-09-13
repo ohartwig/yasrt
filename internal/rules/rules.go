@@ -22,6 +22,7 @@ import (
 type IgnoreReason string
 
 const (
+	IgnoredByRelease IgnoreReason = "release-commit"
 	IgnoredByScope   IgnoreReason = "scope"
 	IgnoredByAuthor  IgnoreReason = "author"
 	IgnoredByTrailer IgnoreReason = "trailer"
@@ -111,6 +112,12 @@ func match(c conventional.Commit, rs []config.Rule) semver.Bump {
 }
 
 func ignoreReason(c conventional.Commit, cfg *config.Config) (IgnoreReason, bool) {
+	// Loop guard 2: the release commit yasrt writes -- chore(release) -- can
+	// never bump, whatever the configuration says. Only that commit: a
+	// feat(release) is somebody's work on a release feature, not ours.
+	if config.IsReleaseCommit(c.Type, c.Scope) {
+		return IgnoredByRelease, true
+	}
 	for _, s := range cfg.Ignore.Scopes {
 		if c.Scope != "" && strings.EqualFold(s, c.Scope) {
 			return IgnoredByScope, true

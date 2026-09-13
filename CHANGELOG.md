@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.8.1](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.8.0...v1.8.1) (2026-09-13)
+
+### :bug: Fixes
+
+* report the module version when built by go install ([63f1c08](https://git.ole-hartwig.eu/yasrt/cli/commit/63f1c08291b49ea8b6bd327c7d6baeb9052795b5))
+
+### :repeat: Continuous Integrations
+
+* mirror to GitHub through a job that leaves the instance's files out ([9562f23](https://git.ole-hartwig.eu/yasrt/cli/commit/9562f23bee30d190e9e79bff5c364699114f4590))
+
+### :wrench: Chores
+
+* CLAUDE.md and .gitsigners stay in this repository ([561da0e](https://git.ole-hartwig.eu/yasrt/cli/commit/561da0eef6c352f771d9425959273e340df7f734))
+* keep agent guidance out of the repository ([e1e6dcb](https://git.ole-hartwig.eu/yasrt/cli/commit/e1e6dcb3d202348951da22deaecbc34a72de9baa))
+* what a public repository must not carry, and what it must ([fba8150](https://git.ole-hartwig.eu/yasrt/cli/commit/fba8150e4b6bae32b5e9ff523fc5481e5432acbe))
+
 ## [1.8.0](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.7.1...v1.8.0) (2026-09-13)
 
 ### :sparkles: Features

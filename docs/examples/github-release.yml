@@ -24,7 +24,7 @@ jobs:
 
       - name: install yasrt
         run: |
-          curl -fsSL -o yasrt "https://git.ole-hartwig.eu/yasrt/cli/-/releases/permalink/latest/downloads/yasrt-linux-amd64"
+          curl -fsSL -o yasrt "https://github.com/ohartwig/yasrt/releases/latest/download/yasrt-linux-amd64"
           chmod +x yasrt
 
       - name: decide

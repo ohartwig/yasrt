@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"git.ole-hartwig.eu/yasrt/cli/internal/config"
-	"git.ole-hartwig.eu/yasrt/cli/internal/conventional"
-	"git.ole-hartwig.eu/yasrt/cli/internal/forge"
-	"git.ole-hartwig.eu/yasrt/cli/internal/render"
-	"git.ole-hartwig.eu/yasrt/cli/internal/rules"
-	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
+	"github.com/ohartwig/yasrt/internal/config"
+	"github.com/ohartwig/yasrt/internal/conventional"
+	"github.com/ohartwig/yasrt/internal/forge"
+	"github.com/ohartwig/yasrt/internal/render"
+	"github.com/ohartwig/yasrt/internal/rules"
+	"github.com/ohartwig/yasrt/internal/semver"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files")

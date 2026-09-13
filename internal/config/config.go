@@ -20,8 +20,8 @@ import (
 	"strings"
 	"time"
 
-	"git.ole-hartwig.eu/yasrt/cli/internal/hooks"
-	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
+	"github.com/ohartwig/yasrt/internal/hooks"
+	"github.com/ohartwig/yasrt/internal/semver"
 	yaml "go.yaml.in/yaml/v3"
 )
 

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://git.ole-hartwig.eu/yasrt/cli/-/raw/main/schema/yasrt.schema.json",
+  "$id": "https://raw.githubusercontent.com/ohartwig/yasrt/main/schema/yasrt.schema.json",
   "title": ".yasrt.yaml",
   "description": "Configuration for yasrt. Layered: files given via --defaults or YASRT_DEFAULTS merge under this one, so a repository only states what differs from its component's defaults. `product` is required in the merged result, not necessarily in this file.",
   "type": "object",

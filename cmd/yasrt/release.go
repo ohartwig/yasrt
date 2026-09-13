@@ -11,13 +11,13 @@ import (
 	"log/slog"
 	"os"
 
-	"git.ole-hartwig.eu/yasrt/cli/internal/analyze"
-	"git.ole-hartwig.eu/yasrt/cli/internal/config"
-	"git.ole-hartwig.eu/yasrt/cli/internal/forge"
-	"git.ole-hartwig.eu/yasrt/cli/internal/git"
-	"git.ole-hartwig.eu/yasrt/cli/internal/output"
-	"git.ole-hartwig.eu/yasrt/cli/internal/release"
-	"git.ole-hartwig.eu/yasrt/cli/internal/semver"
+	"github.com/ohartwig/yasrt/internal/analyze"
+	"github.com/ohartwig/yasrt/internal/config"
+	"github.com/ohartwig/yasrt/internal/forge"
+	"github.com/ohartwig/yasrt/internal/git"
+	"github.com/ohartwig/yasrt/internal/output"
+	"github.com/ohartwig/yasrt/internal/release"
+	"github.com/ohartwig/yasrt/internal/semver"
 )
 
 func cmdRelease(args []string) error {

@@ -1,5 +1,0 @@
-# Agent guidance stays on the machine, not in the repository -- and not in
-# the public mirror.
-CLAUDE.md
-CLAUDE.local.md
-.claude/

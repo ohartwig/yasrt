@@ -240,6 +240,9 @@ mirror:github:
         esac
       done
       echo "publishing $(git rev-parse --short "${CI_DEFAULT_BRANCH}") and tags: $(git tag | tr '\n' ' ')"
+      # refs/heads/* with --prune: whatever branch GitHub still has that this
+      # repository does not push (only the default branch survives the
+      # filter above) is removed, so nothing unfiltered lingers there.
       git push --force --prune "https://x-access-token:${GITHUB_MIRROR_TOKEN}@github.com/ohartwig/yasrt.git" \
-        "refs/heads/${CI_DEFAULT_BRANCH}:refs/heads/${CI_DEFAULT_BRANCH}" 'refs/tags/*:refs/tags/*'
+        'refs/heads/*:refs/heads/*' 'refs/tags/*:refs/tags/*'
       echo "mirrored to github.com/ohartwig/yasrt"

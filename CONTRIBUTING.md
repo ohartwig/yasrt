@@ -19,9 +19,9 @@ contributions are a test and a few lines.
 ## Setup
 
 Any Go 1.27 toolchain and `git`. The signing tests also want `gpg` and
-`ssh-keygen` on `PATH` and skip without them. `.mise.toml` and `lefthook.yml`
-are conveniences the author uses (`mise install`, `lefthook install`), not
-requirements.
+`ssh-keygen` on `PATH` and skip without them. No other tooling is required;
+the author's own checkout carries hook and toolchain manifests that are not
+part of the public repository.
 
 ## Commits
 

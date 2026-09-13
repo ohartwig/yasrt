@@ -40,7 +40,7 @@ in [docs/semantic-release-comparison.md](docs/semantic-release-comparison.md).
 ## Install
 
 **Binary.** Every release ships `yasrt-linux-{amd64,arm64}` and `yasrt-darwin-{arm64,amd64}`
-with a signed `SHA256SUMS` on the release page. Linux and macOS are supported;
+with a `SHA256SUMS` on the release page. Linux and macOS are supported;
 Windows is not.
 
 **Go.**
@@ -121,8 +121,8 @@ merge to the default branch must be allowed to create the release tag —
 `yasrt check` verifies both. A push made with the job token starts no pipeline,
 which is what keeps the release commit from releasing again.
 
-A CI/CD component with this shape (`version`, `release`, shared defaults,
-`release-needs` for pipelines with more between build and tag) lives in
+A CI/CD component with this shape (`version`, `release`, a shared defaults
+layer, `product` and `tag-format` as inputs) lives in
 `devops/ci-cd-components/release-tools` on the same instance:
 `include: [component: $CI_SERVER_HOST/devops/ci-cd-components/release-tools/yasrt@1]`.
 

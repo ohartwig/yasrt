@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.8.2](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.8.1...v1.8.2) (2026-09-13)
+
+### :repeat: Continuous Integrations
+
+* **mirror:** prune every branch GitHub has that the filter did not keep ([2b4f668](https://git.ole-hartwig.eu/yasrt/cli/commit/2b4f6686da0681d1e9c340381ef03186b83e945b))
+* **mirror:** run on the runner that can reach github.com ([b46f5ed](https://git.ole-hartwig.eu/yasrt/cli/commit/b46f5ed89e70080ab65bb290e19733809e9882b2))
+* **mirror:** prune refs with a loop, not grep | xargs ([47b1ad7](https://git.ole-hartwig.eu/yasrt/cli/commit/47b1ad746a454b55f80b7739be8b9730b5278efe))
+
+### :wrench: Chores
+
+* what the public mirror shows ([a35a27b](https://git.ole-hartwig.eu/yasrt/cli/commit/a35a27b7968efb5efbee6c381243108e1d43f9c7))
+
 ## [1.8.1](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.8.0...v1.8.1) (2026-09-13)
 
 ### :bug: Fixes

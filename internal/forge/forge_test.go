@@ -485,3 +485,38 @@ func TestParseKindAndErrors(t *testing.T) {
 		t.Errorf("error = %q", s)
 	}
 }
+
+// A create that took effect but answered with a server error is not retried
+// into a duplicate: the release is read back instead.
+func TestCreateReleaseReadsBackAfterAnAmbiguousFailure(t *testing.T) {
+	for _, kind := range forge.Kinds() {
+		t.Run(string(kind), func(t *testing.T) {
+			var posts, gets int
+			c := clientFor(t, kind, func(w http.ResponseWriter, r *http.Request) {
+				switch r.Method {
+				case http.MethodPost:
+					posts++
+					// It was created -- and then the connection went bad.
+					w.WriteHeader(http.StatusBadGateway)
+				case http.MethodGet:
+					gets++
+					if gets == 1 && posts == 0 {
+						w.WriteHeader(http.StatusNotFound)
+						return
+					}
+					io.WriteString(w, `{"id":3,"tag_name":"1.1.0","html_url":"https://h/r/1.1.0","_links":{"self":"https://h/r/1.1.0"}}`)
+				}
+			})
+			rel, err := c.CreateRelease(context.Background(), "1.1.0", "1.1.0", "notes")
+			if err != nil {
+				t.Fatalf("err = %v", err)
+			}
+			if posts != 1 {
+				t.Errorf("posts = %d, want exactly one create attempt", posts)
+			}
+			if rel == nil || rel.TagName != "1.1.0" {
+				t.Errorf("rel = %+v", rel)
+			}
+		})
+	}
+}

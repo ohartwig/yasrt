@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.10.0](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.9.1...v1.10.0) (2026-09-13)
+
+### :sparkles: Features
+
+* **contrib:** issues named in commits get the note too ([032efb2](https://git.ole-hartwig.eu/yasrt/cli/commit/032efb2c4a7cf8aaa1945200ce28d9bef8231751))
+* **contrib:** the release comments as a script beside the binary ([c0e7b97](https://git.ole-hartwig.eu/yasrt/cli/commit/c0e7b97959b34da9635d4b1c0392a93585ce9a7f))
+
+### :bug: Fixes
+
+* **contrib:** hold the API base to HTTPS ([b058cb2](https://git.ole-hartwig.eu/yasrt/cli/commit/b058cb2dec48d90585d317cc9b43ec2e585c71e6))
+
+### :memo: Documentation
+
+* **tasks:** wave 2 and the trigger-token finding ([2ca1633](https://git.ole-hartwig.eu/yasrt/cli/commit/2ca163303750a3c03aee047545953bda7d1c68bc))
+
 ## [1.9.1](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.9.0...v1.9.1) (2026-09-13)
 
 ### :bug: Fixes

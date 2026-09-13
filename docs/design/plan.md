@@ -1,5 +1,11 @@
 # YASRT — Implementation Plan
 
+> Design history. This document was written before and during the build, for
+> one organisation's estate; it names that estate's repositories, improvement
+> items and risks by their internal ids. It is kept as the record of why
+> things are the way they are. What the tool does today is in
+> [`../SPEC.md`](../SPEC.md); how to use it is in the README.
+
 Companion to [`SPEC.md`](SPEC.md). The specification says *what* the tool does; this document says
 *how it gets built, in what order, and what it collides with*. Task-level detail lives in
 [`tasks.md`](tasks.md).

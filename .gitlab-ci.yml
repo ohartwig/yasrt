@@ -1,10 +1,10 @@
-# yasrt releases itself with yasrt (docs/plan.md, P6).
+# yasrt releases itself with yasrt (docs/design/plan.md, P6).
 #
 # Note the stage order: version -> build -> release. The tag is cut *after* the
 # artefacts exist, which is the whole point of this tool. It also has to be
 # this way here: pushes made with CI_JOB_TOKEN do not start pipelines, so a
 # tag-triggered build would never run. Image repositories migrating to yasrt
-# have to make the same move — see docs/plan.md risk R8.
+# have to make the same move — see docs/design/plan.md risk R8.
 stages: [quick, test, version, build, release, sign]
 
 variables:
@@ -60,7 +60,7 @@ include:
 
 # yasrt has no golangci-lint or govulncheck precedent in this estate to inherit;
 # both are introduced here rather than in the shared Go component, so the two
-# other Go consumers are not affected. See docs/plan.md R7.
+# other Go consumers are not affected. See docs/design/plan.md R7.
 lint:golangci:
   <<: *go-base
   stage: test
@@ -128,13 +128,16 @@ build:binaries:
   script:
     - *needs-release
     - mkdir -p dist
+    # linux for the runners, darwin for the developer who runs `yasrt next`
+    # by hand. Windows is not built: untested, and the hook runner assumes a
+    # POSIX shell.
     - |
-      for arch in amd64 arm64; do
-        CGO_ENABLED=0 GOOS=linux GOARCH="$arch" \
+      for target in linux/amd64 linux/arm64 darwin/arm64 darwin/amd64; do
+        CGO_ENABLED=0 GOOS="${target%/*}" GOARCH="${target#*/}" \
           go build -trimpath -ldflags "-s -w -X main.version=${RELEASE_VERSION}" \
-          -o "dist/yasrt-linux-${arch}" ./cmd/yasrt
+          -o "dist/yasrt-${target%/*}-${target#*/}" ./cmd/yasrt
       done
-    - cd dist && sha256sum yasrt-linux-* > SHA256SUMS && cat SHA256SUMS
+    - cd dist && sha256sum yasrt-* > SHA256SUMS && cat SHA256SUMS
   artifacts:
     paths: [dist/]
     expire_in: 1 day
@@ -157,7 +160,7 @@ upload:package-registry:
     # the runners cannot reach. The API does the same job, and curl is here.
     - cd dist
     - |
-      for f in yasrt-linux-amd64 yasrt-linux-arm64 SHA256SUMS; do
+      for f in yasrt-linux-amd64 yasrt-linux-arm64 yasrt-darwin-arm64 yasrt-darwin-amd64 SHA256SUMS; do
         curl --fail-with-body --silent --show-error \
           --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
           --upload-file "$f" "${PACKAGE_URL}/${RELEASE_VERSION}/${f}"

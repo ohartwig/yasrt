@@ -5,62 +5,147 @@ SPDX-License-Identifier: MIT
 
 # yasrt
 
-One static Go binary that decides whether a repository should be released, and
-publishes the release **after** the artefact has been built. It replaces the npm
-`semantic-release` chain in `devops/ci-cd-components/release-tools`.
+**Yet another semantic release tool** — one static Go binary that reads your
+Conventional Commits, decides whether and what to release, and publishes the
+release **after** the artefact has been built. A replacement for the
+`semantic-release` npm chain, for people who want the same decisions without a
+package manager in the release path.
 
-- **The tag confirms, it does not announce.** `version` decides, `build` runs,
-  and only then does `release` tag. A failed build leaves no tag behind.
-- **No stored secrets.** The job's own token (`CI_JOB_TOKEN`, `GITHUB_TOKEN`)
-  is the only credential required. A signing key is optional, and `sign: auto`
-  degrades to unsigned rather than failing.
-- **Three forges.** GitLab, GitHub and Forgejo — the platforms semantic-release
-  publishes to — detected from the job environment, no configuration needed.
-- **One file per repository.** `.yasrt.yaml`, with almost everything derived
-  from a single `product:` field.
-- **Three dependencies.** A YAML parser, a glob matcher, and git itself.
-- **Extensible out of process.** Hooks call any executable at defined points and
-  hand it the release context — the extensibility of a plugin system without a
-  package manager in the release path.
+- **The tag confirms, it does not announce.** `yasrt next` decides, your build
+  runs, and only then does `yasrt release` tag. A failed build leaves no tag
+  behind.
+- **No stored secrets.** The job's own token (`CI_JOB_TOKEN`, `GITHUB_TOKEN`,
+  `FORGEJO_TOKEN`) is the only credential required. A signing key is optional;
+  `sign: auto` degrades to unsigned rather than failing.
+- **Three forges.** GitLab, GitHub and Forgejo, detected from the job
+  environment.
+- **One file per repository**, almost everything derived from a single
+  `product:` field — and organisation-wide defaults layered underneath, so most
+  repositories need no file at all.
+- **Two dependencies** (a YAML parser and a glob matcher) plus `git` itself.
+- **Extensible out of process.** Hooks call any executable at defined points
+  and hand it the release context: a plugin system's reach without its supply
+  chain.
 
-## Purpose
+## Why
 
-The chain being replaced spent about 21 seconds of every 40-second release job
-on `npm install`, pulled 384 to 516 unpinned transitive packages, and answered
-the deliverability question against the wrong commit range — a genuine `fix:`
-bundled with a `.gitlab-ci.yml` change never shipped (improvement item I-081).
-It also tagged before building, which once left 17 tags with no artefact behind
-them.
+`semantic-release` gets the decisions right and the mechanics wrong for CI:
+it tags before anything is built, resolves hundreds of unpinned packages at
+run time, and judges "did anything shippable change?" against the push range
+rather than the last release — so a real fix bundled with a CI change never
+ships. yasrt keeps the decisions (same commit conventions, same version
+arithmetic, same changelog shape) and fixes the mechanics. The full mapping is
+in [docs/semantic-release-comparison.md](docs/semantic-release-comparison.md).
 
 ## Install
 
-In CI, use the image:
+**Binary.** Every release ships `yasrt-linux-{amd64,arm64}` and `yasrt-darwin-{arm64,amd64}`
+with a signed `SHA256SUMS` on the release page. Linux and macOS are supported;
+Windows is not.
 
-```yaml
-include:
-  - component: $CI_SERVER_HOST/devops/ci-cd-components/release-tools/yasrt@1
-```
-
-Locally:
+**Go.**
 
 ```sh
-go install git.ole-hartwig.eu/yasrt/cli/cmd/yasrt@latest   # or @v1.7.0
+go install git.ole-hartwig.eu/yasrt/cli/cmd/yasrt@latest   # or a version: @v1.7.0
 ```
 
-Binaries for `linux/amd64` and `linux/arm64` are published to this project's
-generic package registry with a signed `SHA256SUMS` manifest.
+**Container.** `registry.ole-hartwig.eu/devops/images/yasrt:1` is the image the
+CI examples below use. It is a 30 MB Wolfi image with `git`, `gpg` and
+`ssh-keygen`; build your own from the same recipe if you would rather not pull
+ours.
 
-On GitHub Actions or Forgejo Actions the same binary runs with the workflow's
-token:
+## Use
+
+Three commands, two of which write nothing:
+
+```sh
+yasrt next --output .release.env   # decide; writes nothing to the repository
+yasrt check                        # validate config, probe the environment
+yasrt release                      # publish; idempotent, safe to re-run
+```
+
+`next` leaves its decision in a dotenv file — `RELEASE_STATUS` is one of
+`release`, `no-bump`, `not-deliverable` or `already-released`, with
+`RELEASE_VERSION`, `RELEASE_TAG`, `RELEASE_PREVIOUS`, `RELEASE_BUMP`,
+`RELEASE_REASON` and `RELEASE_COMMIT` beside it. Your build reads it;
+`release` reads it back and refuses to tag anything other than the commit that
+was analysed. These keys and the exit codes are a public interface:
+
+| exit | meaning |
+|---|---|
+| 0 | analysis or release completed |
+| 1 | configuration or git error |
+| 2 | invalid arguments |
+| 3 | `no-bump`, with `--fail-on-skip` |
+| 4 | `not-deliverable`, with `--fail-on-skip` |
+| 5 | the repository moved: HEAD changed, or the tag exists on another commit |
+
+### GitLab CI
 
 ```yaml
-- run: yasrt next && <build> && yasrt release
-  env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # FORGEJO_TOKEN on Forgejo
+stages: [version, build, release]
+
+default:
+  image:
+    name: registry.ole-hartwig.eu/devops/images/yasrt:1
+    entrypoint: [""]
+
+version:
+  stage: version
+  variables: { GIT_DEPTH: 0 }          # yasrt needs the full history
+  script: yasrt next --output .release.env
+  artifacts:
+    reports: { dotenv: .release.env }
+  rules: [{ if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH }]
+
+build:
+  stage: build
+  image: your/build-image
+  script:
+    - '[ "$RELEASE_STATUS" = "release" ] || exit 0'   # gate in the script, not in rules:
+    - make build VERSION=$RELEASE_VERSION
+  rules: [{ if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH }]
+
+release:
+  stage: release
+  variables: { GIT_DEPTH: 0 }
+  script: yasrt release
+  rules: [{ if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH }]
 ```
 
-The job needs `contents: write`. Where the platform cannot be told apart from
-its variables, `--forge gitlab|github|forgejo` (or `YASRT_FORGE`) says so.
+GitLab evaluates `rules:` when the pipeline is created, before `.release.env`
+exists — downstream jobs therefore gate on `RELEASE_STATUS` **in the script**.
+The project must allow job-token pushes (*Settings → CI/CD → Job token
+permissions → Allow Git push requests to the repository*), and whoever may
+merge to the default branch must be allowed to create the release tag —
+`yasrt check` verifies both. A push made with the job token starts no pipeline,
+which is what keeps the release commit from releasing again.
+
+A CI/CD component with this shape (`version`, `release`, shared defaults,
+`release-needs` for pipelines with more between build and tag) lives in
+`devops/ci-cd-components/release-tools` on the same instance:
+`include: [component: $CI_SERVER_HOST/devops/ci-cd-components/release-tools/yasrt@1]`.
+
+### GitHub Actions and Forgejo Actions
+
+```yaml
+permissions: { contents: write }
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 0 }
+      - run: yasrt next --output .release.env
+      - run: make build                    # gate on RELEASE_STATUS inside
+      - run: yasrt release
+        env: { GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} }   # FORGEJO_TOKEN on Forgejo
+```
+
+A push made with `GITHUB_TOKEN` starts no workflow, so the changelog commit
+does not release itself. Where the platform cannot be told apart from its
+variables, say `--forge gitlab|github|forgejo` or set `YASRT_FORGE`. Complete
+files are in [docs/examples](docs/examples/).
 
 ## Configure
 
@@ -70,15 +155,25 @@ its variables, `--forge gitlab|github|forgejo` (or `YASRT_FORGE`) says so.
 product: image    # image | package | extension | custom
 ```
 
-`product` derives both the paths that cannot constitute a release and the tag
-format, matching what this estate already does:
+`product` derives the paths that cannot constitute a release and the tag
+format:
 
 | product | non-release paths | tag format |
 |---|---|---|
-| `image` | `CHANGELOG.md`, `README.md`, `docs/**` — **not** `.gitlab-ci.yml`, which builds the image | `1.2.3` |
+| `image` | `CHANGELOG.md`, `README.md`, `docs/**` — **not** the CI file, which builds the image | `1.2.3` |
 | `package` | the above **plus** `.gitlab-ci.yml`, `.gitlab/**`, `.github/**` | `v1.2.3` |
 | `extension` | as `package` | `v1.2.3` |
 | `custom` | nothing derived; `non_release_paths` is required | `1.2.3` |
+
+The default rules are semantic-release's: a breaking change is a major, `feat`
+a minor, `fix`, `perf` and `revert` a patch, everything else nothing.
+
+**Organisation defaults.** `--defaults file` (repeatable, or a `:`-separated list in `YASRT_DEFAULTS`)
+layers YAML files *under* the repository's own: maps merge, scalars and lists
+replace, the repository wins. That is where a bot identity, `chore → patch`
+for dependency bumps, or a hook manifest as a non-release path belong — stated
+once, in the CI template every repository already includes, rather than in
+every repository.
 
 ### Hooks
 
@@ -93,10 +188,12 @@ hooks:
       name: policy gate
       timeout: 90s
   after_tag:
-    - run: ./scripts/publish-composer.sh
+    - run: ./scripts/publish.sh
   after_release:
     - run: ./scripts/notify.sh
       allow_failure: true
+  on_failure:
+    - run: ./scripts/page-someone.sh
 ```
 
 | event | when | failure |
@@ -108,71 +205,14 @@ hooks:
 | `on_failure` | when `release` is about to exit non-zero; told `error` and `failed_step` | reported |
 
 `args` are passed verbatim — no shell, so nothing is word-split or
-glob-expanded. `allow_failure` overrides the default either way. Hooks are never
-handed a credential; one that needs a token reads it from its own environment.
+glob-expanded. Hooks inherit the job's environment (a hook that needs a token
+reads it there) and are never handed one in the payload; what they print is
+recorded in the run report with secrets masked.
 
 Everything else is optional and documented in
 [`schema/yasrt.schema.json`](schema/yasrt.schema.json), which editors pick up
-for completion and which `yasrt check` validates against. The full surface is
+for completion and `yasrt check` validates against; the full surface is
 specified in [`docs/SPEC.md`](docs/SPEC.md) §5.
-
-## Use
-
-```sh
-yasrt next --output .release.env   # decide; writes nothing to the repository
-yasrt release                      # publish; idempotent
-yasrt check                        # validate config and probe the environment
-```
-
-`next` always exits `0` once the analysis completed — the answer is in
-`RELEASE_STATUS`, which is one of `release`, `no-bump`, `not-deliverable` or
-`already-released`. Add `--fail-on-skip` to turn the last three into exit codes.
-
-| exit | meaning |
-|---|---|
-| 0 | analysis or release completed |
-| 1 | configuration or git error |
-| 2 | invalid arguments |
-| 3 | `no-bump`, with `--fail-on-skip` |
-| 4 | `not-deliverable`, with `--fail-on-skip` |
-| 5 | the repository moved: HEAD changed, or the tag exists on another commit |
-
-The dotenv keys `RELEASE_STATUS`, `RELEASE_VERSION`, `RELEASE_TAG`,
-`RELEASE_PREVIOUS`, `RELEASE_BUMP`, `RELEASE_REASON` and `RELEASE_COMMIT` are a
-public interface; consuming pipelines switch on them.
-
-Because GitLab evaluates `rules:` at pipeline creation — before `.release.env`
-exists — downstream jobs must check the status **in the script**, never in
-`rules:`:
-
-```yaml
-build:
-  needs: [version]
-  script:
-    - '[ "$RELEASE_STATUS" = "release" ] || exit 0'
-    - docker build --label org.opencontainers.image.version=$RELEASE_VERSION .
-```
-
-## Develop
-
-```sh
-go test ./...                                   # unit, golden and integration
-go test ./internal/render -update               # rewrite golden files
-go test ./internal/analyze -run TestForce -v     # one test
-gofmt -l . && go vet ./...
-```
-
-Integration tests build throwaway git repositories and serve the GitLab, GitHub
-and Forgejo release APIs from `httptest`. Nothing in the suite touches a real
-instance of any of them.
-
-## Decommission
-
-Remove the component include and `.yasrt.yaml`, and put the previous
-`semantic-release` include back. yasrt holds no state of its own: everything it
-produces is a tag, a commit, a release on the forge and a job artefact. On
-GitLab, disable the project setting **Allow Git push requests to the
-repository** afterwards if nothing else needs it.
 
 ## Forges
 
@@ -193,34 +233,46 @@ api.github.com. `gitea` is accepted as a synonym for `forgejo`.
 
 `release_commit.sign` takes `auto` (sign when a key is present), `required`
 (fail before anything is written if it is not) or `off`. The key comes from
-`GPG_SEM_REL_B64` and may be **either an OpenPGP or an OpenSSH private key**,
-base64-encoded — yasrt detects which from the material rather than asking you to
-declare it. An SSH key is written to a 0600 file for the duration of the run and
-removed afterwards; GitLab verifies SSH signatures, and this estate already
-trusts SSH keys for human commits through `.gitsigners`.
+`GPG_SEM_REL_B64` (the variable name is configurable) and may be **either an
+OpenPGP or an OpenSSH private key**, base64-encoded — yasrt detects which from
+the material. Both live in a private temporary directory for the duration of
+the run and are removed afterwards; all three forges verify SSH signatures.
 
 Both paths are tested by generating real keys and verifying the resulting tag
-and commit with `git verify-tag` / `git verify-commit`, rather than by asserting
-that yasrt called git with the right flag.
-
-## Who may release
-
-A `CI_JOB_TOKEN` push acts as the user who triggered the pipeline — on the
-default branch, whoever merged. So the tag push succeeds exactly when the
-weakest role allowed to merge is also allowed to create the release tag. If
-merging is Maintainer-only, a Maintainer-only protected tag is consistent and
-nothing needs loosening. `yasrt check` compares the two and reports a mismatch
-as fatal before the first release depends on it.
+and commit with `git verify-tag` / `git verify-commit`.
 
 ## Security
 
-The only required credential is `CI_JOB_TOKEN`, taken from the job environment.
-`GPG_SEM_REL_B64` is optional and is the sole long-lived secret; it is never
-written to disk outside the job and never logged. Tokens and credentials
-embedded in git URLs are masked in every log line and in the run report by the
-log handler itself, not at call sites.
+The only required credential is the job's token, taken from the environment
+and handed to git through a credential helper — never in a URL or an argument
+list. The signing key is the sole optional long-lived secret. Both are masked
+in every log line, in error messages and in the run report. Report
+vulnerabilities as described in [SECURITY.md](SECURITY.md).
 
-Pushing requires the project setting **Allow Git push requests to the
-repository**, and the triggering identity must be allowed to create the
-protected tag. `yasrt check --push` proves both before a real release depends on
-them. Report vulnerabilities as described in [SECURITY.md](SECURITY.md).
+## Develop
+
+```sh
+go test ./...                                   # unit, golden and integration
+go test ./internal/render -update               # rewrite golden files
+go test ./internal/analyze -run TestForce -v     # one test
+gofmt -l . && go vet ./...
+```
+
+Integration tests build throwaway git repositories and serve the GitLab,
+GitHub and Forgejo release APIs from `httptest`; the signing tests generate
+real keys and skip when `gpg` or `ssh-keygen` is absent. Nothing in the suite
+touches a real instance of anything. Design history — the specification, the
+plan with its decisions and risks, and the task log — is under
+[docs/](docs/).
+
+## Removing yasrt
+
+Delete `.yasrt.yaml` and the CI jobs. yasrt holds no state of its own:
+everything it produces is a tag, a commit, a release on the forge and a job
+artefact. On GitLab, disable the job-token push setting afterwards if nothing
+else needs it.
+
+## License
+
+MIT — see [LICENSE](LICENSE). Every file carries an SPDX header; the
+repository is [REUSE](https://reuse.software/) compliant.

@@ -99,6 +99,16 @@ func newFakeGitLab(t *testing.T) *fakeGitLab {
 		w.WriteHeader(http.StatusCreated)
 	})
 	mux.HandleFunc("POST /api/v4/projects/{id}/trigger/pipeline", func(w http.ResponseWriter, r *http.Request) {
+		// GitLab's trigger endpoint reads the token from the body, not from
+		// the JOB-TOKEN header every other endpoint accepts.
+		var body struct {
+			Token string `json:"token"`
+		}
+		if err := json.UnmarshalRead(r.Body, &body); err != nil || body.Token == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			io.WriteString(w, `{"error":"token is missing"}`)
+			return
+		}
 		f.triggers.Add(1)
 		io.WriteString(w, `{"id":7,"web_url":"https://git/p/-/pipelines/7"}`)
 	})

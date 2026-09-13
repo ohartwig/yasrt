@@ -311,10 +311,14 @@ func (c *gitlabClient) UploadAsset(ctx context.Context, _ *Release, up Upload) (
 
 // TriggerPipeline starts a pipeline in another project. GitLab only.
 func (c *gitlabClient) TriggerPipeline(ctx context.Context, project, ref string, vars map[string]string) (string, error) {
+	// The trigger endpoint is the one call that ignores the JOB-TOKEN header:
+	// it wants the token in the body, where a trigger token would go, and
+	// answers "token is missing" otherwise. The job token is a valid value.
 	req := struct {
+		Token     string            `json:"token"`
 		Ref       string            `json:"ref"`
 		Variables map[string]string `json:"variables,omitzero"`
-	}{ref, vars}
+	}{c.rest.authVal, ref, vars}
 	var out struct {
 		WebURL string `json:"web_url,omitzero"`
 	}

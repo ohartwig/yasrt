@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.7.1](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.7.0...v1.7.1) (2026-09-13)
+
+### :zap: Refactor
+
+* errors.AsType, and a package named for what it does ([4b21fac](https://git.ole-hartwig.eu/yasrt/cli/commit/4b21fac0c2b9fcab443eaf4182eb97e194e160e6))
+* split release.go by concern ([6dc331c](https://git.ole-hartwig.eu/yasrt/cli/commit/6dc331c1a39e72d133de3648213cd8535646dfe8))
+
+### :wrench: Chores
+
+* the small items from the OSS review ([2e5f08c](https://git.ole-hartwig.eu/yasrt/cli/commit/2e5f08cab934bd45c5d52d39d701738d3fe8dfbd))
+
 ## [1.7.0](https://git.ole-hartwig.eu/yasrt/cli/compare/1.6.1...v1.7.0) (2026-09-13)
 
 ### :sparkles: Features

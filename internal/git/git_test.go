@@ -358,3 +358,33 @@ func TestCurrentBranch(t *testing.T) {
 		t.Error("detached HEAD should be an error, not an empty string")
 	}
 }
+
+// The token reaches git through a credential helper that reads the child's
+// environment -- never through the URL or the argument list, which every
+// process in a container can read.
+func TestCredentialTravelsThroughTheEnvironmentOnly(t *testing.T) {
+	tr := testrepo.New(t)
+	tr.CommitFile("a", "1", "feat: a")
+	r, err := git.Open(tr.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.UseCredential("gitlab-ci-token", "s3cret-token")
+
+	// A local remote needs no credential, but the helper is still configured
+	// and must not break the command; and the token must be masked.
+	bare := tr.WithRemote()
+	if err := r.Push(bare, "HEAD:refs/heads/main"); err != nil {
+		t.Fatalf("push with helper configured: %v", err)
+	}
+	err = r.Push("https://s3cret-token@127.0.0.1:1/nowhere.git", "HEAD:refs/heads/x")
+	if err == nil {
+		t.Fatal("expected the push to nowhere to fail")
+	}
+	if strings.Contains(err.Error(), "s3cret-token") {
+		t.Errorf("token leaked into the error: %v", err)
+	}
+	if got := r.Mask("password=s3cret-token"); strings.Contains(got, "s3cret-token") {
+		t.Errorf("token not masked: %q", got)
+	}
+}

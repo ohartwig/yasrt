@@ -39,7 +39,7 @@ func ctxFor() hooks.Context {
 }
 
 func TestNoHooksIsNotAnError(t *testing.T) {
-	res, err := hooks.Run(context.Background(), t.TempDir(), hooks.BeforeTag, nil, ctxFor(), discard)
+	res, err := hooks.Run(context.Background(), t.TempDir(), hooks.BeforeTag, nil, ctxFor(), nil, discard)
 	if err != nil || res != nil {
 		t.Fatalf("res=%+v err=%v", res, err)
 	}
@@ -49,8 +49,7 @@ func TestHookReceivesContextAsJSONOnStdin(t *testing.T) {
 	dir := t.TempDir()
 	run := script(t, dir, "capture.sh", "cat > payload.json")
 
-	_, err := hooks.Run(context.Background(), dir, hooks.AfterTag,
-		[]hooks.Hook{{Run: run}}, ctxFor(), discard)
+	_, err := hooks.Run(context.Background(), dir, hooks.AfterTag, []hooks.Hook{{Run: run}}, ctxFor(), nil, discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,8 +78,7 @@ func TestHookReceivesReleaseEnvironment(t *testing.T) {
 	dir := t.TempDir()
 	run := script(t, dir, "env.sh", `printf '%s|%s|%s|%s\n' "$YASRT_EVENT" "$RELEASE_VERSION" "$RELEASE_TAG" "$RELEASE_STATUS"`)
 
-	res, err := hooks.Run(context.Background(), dir, hooks.AfterRelease,
-		[]hooks.Hook{{Run: run}}, ctxFor(), discard)
+	res, err := hooks.Run(context.Background(), dir, hooks.AfterRelease, []hooks.Hook{{Run: run}}, ctxFor(), nil, discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,8 +92,7 @@ func TestArgumentsArePassedWithoutAShell(t *testing.T) {
 	run := script(t, dir, "args.sh", `printf '%s\n' "$1" "$2"`)
 
 	// A value containing a space and a glob must arrive intact.
-	res, err := hooks.Run(context.Background(), dir, hooks.AfterTag,
-		[]hooks.Hook{{Run: run, Args: []string{"two words", "*.go"}}}, ctxFor(), discard)
+	res, err := hooks.Run(context.Background(), dir, hooks.AfterTag, []hooks.Hook{{Run: run, Args: []string{"two words", "*.go"}}}, ctxFor(), nil, discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,8 +105,7 @@ func TestFailingHookAbortsBeforeTag(t *testing.T) {
 	dir := t.TempDir()
 	run := script(t, dir, "no.sh", "echo 'not today' >&2; exit 3")
 
-	res, err := hooks.Run(context.Background(), dir, hooks.BeforeTag,
-		[]hooks.Hook{{Run: run}}, ctxFor(), discard)
+	res, err := hooks.Run(context.Background(), dir, hooks.BeforeTag, []hooks.Hook{{Run: run}}, ctxFor(), nil, discard)
 	if !errors.Is(err, hooks.ErrHookFailed) {
 		t.Fatalf("err = %v", err)
 	}
@@ -126,8 +122,7 @@ func TestFailingHookAfterReleaseIsNotFatal(t *testing.T) {
 	dir := t.TempDir()
 	run := script(t, dir, "no.sh", "exit 1")
 
-	res, err := hooks.Run(context.Background(), dir, hooks.AfterRelease,
-		[]hooks.Hook{{Run: run}}, ctxFor(), discard)
+	res, err := hooks.Run(context.Background(), dir, hooks.AfterRelease, []hooks.Hook{{Run: run}}, ctxFor(), nil, discard)
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
@@ -141,12 +136,10 @@ func TestAllowFailureOverridesTheDefault(t *testing.T) {
 	run := script(t, dir, "no.sh", "exit 1")
 	yes, no := true, false
 
-	if _, err := hooks.Run(context.Background(), dir, hooks.BeforeTag,
-		[]hooks.Hook{{Run: run, AllowFailure: &yes}}, ctxFor(), discard); err != nil {
+	if _, err := hooks.Run(context.Background(), dir, hooks.BeforeTag, []hooks.Hook{{Run: run, AllowFailure: &yes}}, ctxFor(), nil, discard); err != nil {
 		t.Errorf("allow_failure true should tolerate a failure: %v", err)
 	}
-	if _, err := hooks.Run(context.Background(), dir, hooks.AfterRelease,
-		[]hooks.Hook{{Run: run, AllowFailure: &no}}, ctxFor(), discard); !errors.Is(err, hooks.ErrHookFailed) {
+	if _, err := hooks.Run(context.Background(), dir, hooks.AfterRelease, []hooks.Hook{{Run: run, AllowFailure: &no}}, ctxFor(), nil, discard); !errors.Is(err, hooks.ErrHookFailed) {
 		t.Errorf("allow_failure false should make it fatal: %v", err)
 	}
 }
@@ -159,7 +152,7 @@ func TestHooksRunInOrderAndStopAtTheFirstFatalOne(t *testing.T) {
 
 	res, err := hooks.Run(context.Background(), dir, hooks.BeforeTag, []hooks.Hook{
 		{Run: first}, {Run: boom}, {Run: third},
-	}, ctxFor(), discard)
+	}, ctxFor(), nil, discard)
 	if !errors.Is(err, hooks.ErrHookFailed) {
 		t.Fatalf("err = %v", err)
 	}
@@ -176,8 +169,7 @@ func TestTimeout(t *testing.T) {
 	dir := t.TempDir()
 	run := script(t, dir, "slow.sh", "sleep 5")
 
-	res, err := hooks.Run(context.Background(), dir, hooks.BeforeTag,
-		[]hooks.Hook{{Run: run, Timeout: "150ms"}}, ctxFor(), discard)
+	res, err := hooks.Run(context.Background(), dir, hooks.BeforeTag, []hooks.Hook{{Run: run, Timeout: "150ms"}}, ctxFor(), nil, discard)
 	if !errors.Is(err, hooks.ErrHookFailed) {
 		t.Fatalf("err = %v", err)
 	}
@@ -189,16 +181,14 @@ func TestTimeout(t *testing.T) {
 func TestInvalidTimeoutIsReportedNotIgnored(t *testing.T) {
 	dir := t.TempDir()
 	run := script(t, dir, "ok.sh", "true")
-	_, err := hooks.Run(context.Background(), dir, hooks.BeforeTag,
-		[]hooks.Hook{{Run: run, Timeout: "soon"}}, ctxFor(), discard)
+	_, err := hooks.Run(context.Background(), dir, hooks.BeforeTag, []hooks.Hook{{Run: run, Timeout: "soon"}}, ctxFor(), nil, discard)
 	if !errors.Is(err, hooks.ErrHookFailed) {
 		t.Fatalf("err = %v", err)
 	}
 }
 
 func TestMissingExecutableIsAFailure(t *testing.T) {
-	_, err := hooks.Run(context.Background(), t.TempDir(), hooks.BeforeTag,
-		[]hooks.Hook{{Run: "./definitely-not-here"}}, ctxFor(), discard)
+	_, err := hooks.Run(context.Background(), t.TempDir(), hooks.BeforeTag, []hooks.Hook{{Run: "./definitely-not-here"}}, ctxFor(), nil, discard)
 	if !errors.Is(err, hooks.ErrHookFailed) {
 		t.Fatalf("err = %v", err)
 	}
@@ -207,8 +197,7 @@ func TestMissingExecutableIsAFailure(t *testing.T) {
 func TestNameLabelsTheHook(t *testing.T) {
 	dir := t.TempDir()
 	run := script(t, dir, "ok.sh", "true")
-	res, err := hooks.Run(context.Background(), dir, hooks.AfterTag,
-		[]hooks.Hook{{Run: run, Name: "publish to TER"}}, ctxFor(), discard)
+	res, err := hooks.Run(context.Background(), dir, hooks.AfterTag, []hooks.Hook{{Run: run, Name: "publish to TER"}}, ctxFor(), nil, discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,8 +211,7 @@ func TestContextCancellationStopsHooks(t *testing.T) {
 	run := script(t, dir, "slow.sh", "sleep 5")
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := hooks.Run(ctx, dir, hooks.BeforeTag,
-		[]hooks.Hook{{Run: run}}, ctxFor(), discard); err == nil {
+	if _, err := hooks.Run(ctx, dir, hooks.BeforeTag, []hooks.Hook{{Run: run}}, ctxFor(), nil, discard); err == nil {
 		t.Fatal("expected the cancelled context to surface")
 	}
 }
@@ -238,12 +226,23 @@ func TestEventsCoverEveryHookPoint(t *testing.T) {
 func TestFailingOnFailureHookIsNotFatal(t *testing.T) {
 	dir := t.TempDir()
 	run := script(t, dir, "fail.sh", "#!/bin/sh\nexit 3\n")
-	res, err := hooks.Run(context.Background(), dir, hooks.OnFailure,
-		[]hooks.Hook{{Run: run}}, ctxFor(), discard)
+	res, err := hooks.Run(context.Background(), dir, hooks.OnFailure, []hooks.Hook{{Run: run}}, ctxFor(), nil, discard)
 	if err != nil {
 		t.Fatalf("on_failure must not be fatal: %v", err)
 	}
 	if len(res) != 1 || res[0].ExitCode != 3 || res[0].Fatal {
 		t.Errorf("res = %+v", res)
+	}
+}
+
+// A hook that prints a secret must not put it into the report.
+func TestHookOutputIsMasked(t *testing.T) {
+	dir := t.TempDir()
+	run := script(t, dir, "leak.sh", "#!/bin/sh\necho \"token=$LEAKY\"\nexit 1\n")
+	t.Setenv("LEAKY", "s3cret")
+	mask := func(s string) string { return strings.ReplaceAll(s, "s3cret", "***") }
+	res, _ := hooks.Run(context.Background(), dir, hooks.AfterRelease, []hooks.Hook{{Run: run}}, ctxFor(), mask, discard)
+	if len(res) != 1 || strings.Contains(res[0].Output, "s3cret") || !strings.Contains(res[0].Output, "***") {
+		t.Errorf("output = %+v", res)
 	}
 }

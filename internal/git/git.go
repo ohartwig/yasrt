@@ -42,6 +42,38 @@ type Repo struct {
 	dir string
 	// secrets are masked out of every error and log line this package emits.
 	secrets []string
+	// credUser and credToken, when set, are handed to git through a
+	// credential helper that reads them from the child's environment. Never
+	// through the URL or the argument list: those are visible to every
+	// process in the container, the environment only to the same user.
+	credUser, credToken string
+	// extraEnv is added to every git command -- for GNUPGHOME, so that git's
+	// own gpg child looks in the same private keyring this run imported into.
+	extraEnv []string
+}
+
+// SetEnv adds a variable to the environment of every following git command.
+func (r *Repo) SetEnv(key, value string) { r.extraEnv = append(r.extraEnv, key+"="+value) }
+
+// credentialEnv names the variables the helper reads.
+const (
+	credUserEnv  = "YASRT_CREDENTIAL_USERNAME"
+	credTokenEnv = "YASRT_CREDENTIAL_PASSWORD"
+)
+
+// credentialHelper is a git credential helper as a shell function: git runs it
+// with sh, and it answers with what the environment holds. The leading empty
+// helper resets any helper configured elsewhere, so a stored credential of
+// the machine's user cannot be picked instead.
+const credentialHelper = "!f() { echo \"username=$" + credUserEnv + "\"; echo \"password=$" + credTokenEnv + "\"; }; f"
+
+// UseCredential makes every following git command authenticate over HTTPS
+// with user and token. The token is registered as a secret as well.
+func (r *Repo) UseCredential(user, token string) {
+	r.credUser, r.credToken = user, token
+	if token != "" {
+		r.AddSecret(token)
+	}
 }
 
 // Open verifies that dir is inside a work tree and returns its root.
@@ -108,15 +140,24 @@ func (r *Repo) run(args ...string) (string, error) {
 }
 
 func (r *Repo) runFull(args ...string) (string, string, error) {
-	cmd := exec.Command("git", args...)
-	if r.dir != "" {
-		cmd.Dir = r.dir
-	}
-	cmd.Env = append(os.Environ(),
+	env := append(os.Environ(),
 		"GIT_TERMINAL_PROMPT=0", // never block a CI job on a credential prompt
 		"GIT_ADVICE=0",
 		"LC_ALL=C",
 	)
+	env = append(env, r.extraEnv...)
+	if r.credToken != "" {
+		args = append([]string{
+			"-c", "credential.helper=",
+			"-c", "credential.helper=" + credentialHelper,
+		}, args...)
+		env = append(env, credUserEnv+"="+r.credUser, credTokenEnv+"="+r.credToken)
+	}
+	cmd := exec.Command("git", args...)
+	if r.dir != "" {
+		cmd.Dir = r.dir
+	}
+	cmd.Env = env
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := cmd.Run()

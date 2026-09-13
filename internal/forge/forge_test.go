@@ -129,14 +129,14 @@ func TestURLShapes(t *testing.T) {
 	}
 }
 
-func TestPushCredentials(t *testing.T) {
-	for kind, want := range map[forge.Kind]string{
-		forge.GitLab:  "gitlab-ci-token:tok",
-		forge.GitHub:  "x-access-token:tok",
-		forge.Forgejo: "tok:x-oauth-basic",
+func TestPushCredential(t *testing.T) {
+	for kind, want := range map[forge.Kind][2]string{
+		forge.GitLab:  {"gitlab-ci-token", "tok"},
+		forge.GitHub:  {"x-access-token", "tok"},
+		forge.Forgejo: {"tok", "x-oauth-basic"},
 	} {
-		if got := forge.PushCredentials(kind, "tok"); got != want {
-			t.Errorf("%s = %q, want %q", kind, got, want)
+		if u, p := forge.PushCredential(kind, "tok"); u != want[0] || p != want[1] {
+			t.Errorf("%s = %q/%q, want %q/%q", kind, u, p, want[0], want[1])
 		}
 	}
 }
@@ -483,5 +483,40 @@ func TestParseKindAndErrors(t *testing.T) {
 	e := &forge.APIError{Status: 502, Method: "POST", Path: "/x", Body: strings.Repeat("y", 500)}
 	if s := e.Error(); !strings.Contains(s, "502") || !strings.HasSuffix(s, "…") || !e.Retryable() {
 		t.Errorf("error = %q", s)
+	}
+}
+
+// A create that took effect but answered with a server error is not retried
+// into a duplicate: the release is read back instead.
+func TestCreateReleaseReadsBackAfterAnAmbiguousFailure(t *testing.T) {
+	for _, kind := range forge.Kinds() {
+		t.Run(string(kind), func(t *testing.T) {
+			var posts, gets int
+			c := clientFor(t, kind, func(w http.ResponseWriter, r *http.Request) {
+				switch r.Method {
+				case http.MethodPost:
+					posts++
+					// It was created -- and then the connection went bad.
+					w.WriteHeader(http.StatusBadGateway)
+				case http.MethodGet:
+					gets++
+					if gets == 1 && posts == 0 {
+						w.WriteHeader(http.StatusNotFound)
+						return
+					}
+					io.WriteString(w, `{"id":3,"tag_name":"1.1.0","html_url":"https://h/r/1.1.0","_links":{"self":"https://h/r/1.1.0"}}`)
+				}
+			})
+			rel, err := c.CreateRelease(context.Background(), "1.1.0", "1.1.0", "notes")
+			if err != nil {
+				t.Fatalf("err = %v", err)
+			}
+			if posts != 1 {
+				t.Errorf("posts = %d, want exactly one create attempt", posts)
+			}
+			if rel == nil || rel.TagName != "1.1.0" {
+				t.Errorf("rel = %+v", rel)
+			}
+		})
 	}
 }

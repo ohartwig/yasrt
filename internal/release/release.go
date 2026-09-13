@@ -173,7 +173,7 @@ func Run(ctx context.Context, o Options) (*Report, error) {
 	hctx := hookContext(o.Result, rep.Notes, o.URLs.Base, o.DryRun)
 	hctx.Error = err.Error()
 	hctx.FailedStep = rep.failedStep()
-	hres, hookErr := hooks.Run(ctx, o.Repo.Dir(), hooks.OnFailure, hs, hctx, log)
+	hres, hookErr := hooks.Run(ctx, o.Repo.Dir(), hooks.OnFailure, hs, hctx, o.Repo.Mask, log)
 	rep.Hooks = append(rep.Hooks, hres...)
 	if hookErr != nil {
 		log.Warn("on_failure hook failed too", "err", hookErr)
@@ -200,6 +200,9 @@ func run(ctx context.Context, o Options, log *slog.Logger) (*Report, error) {
 	}
 	if o.Token != "" {
 		repo.AddSecret(o.Token)
+	}
+	if k := strings.TrimSpace(o.GPGKeyB64); k != "" {
+		repo.AddSecret(k)
 	}
 
 	// Idempotency anchor first: what the remote already knows about this tag
@@ -274,7 +277,7 @@ func run(ctx context.Context, o Options, log *slog.Logger) (*Report, error) {
 
 	// before_tag runs while nothing has been written yet, so a hook that says
 	// no leaves the repository exactly as it found it.
-	hres, hookErr := hooks.Run(ctx, repo.Dir(), hooks.BeforeTag, cfg.Hooks.For(hooks.BeforeTag), hctx, log)
+	hres, hookErr := hooks.Run(ctx, repo.Dir(), hooks.BeforeTag, cfg.Hooks.For(hooks.BeforeTag), hctx, repo.Mask, log)
 	rep.Hooks = append(rep.Hooks, hres...)
 	if hookErr != nil {
 		rep.Steps = append(rep.Steps, Step{Name: "hook:before_tag", Status: StepFailed, Detail: hookErr.Error()})
@@ -311,7 +314,7 @@ func run(ctx context.Context, o Options, log *slog.Logger) (*Report, error) {
 		rep.Steps = append(rep.Steps, Step{Name: "changelog", Status: StepSkipped, Detail: "release_commit disabled"})
 	}
 
-	pushURL, err := authenticatedURL(repo, o.remote(), o.Token, o.forgeKind())
+	pushURL, err := pushURL(repo, o.remote(), o.Token, o.forgeKind())
 	if err != nil {
 		return rep, err
 	}
@@ -340,7 +343,7 @@ func run(ctx context.Context, o Options, log *slog.Logger) (*Report, error) {
 		log.Info("tag pushed", "tag", res.Tag, "commit", short(res.Commit))
 	}
 
-	hres, hookErr = hooks.Run(ctx, repo.Dir(), hooks.AfterTag, cfg.Hooks.For(hooks.AfterTag), hctx, log)
+	hres, hookErr = hooks.Run(ctx, repo.Dir(), hooks.AfterTag, cfg.Hooks.For(hooks.AfterTag), hctx, repo.Mask, log)
 	rep.Hooks = append(rep.Hooks, hres...)
 	if hookErr != nil {
 		rep.Steps = append(rep.Steps, Step{Name: "hook:after_tag", Status: StepFailed, Detail: hookErr.Error()})
@@ -382,7 +385,7 @@ func run(ctx context.Context, o Options, log *slog.Logger) (*Report, error) {
 
 	// Step 7: after_release hooks. The release has already happened, so a
 	// failure here is reported rather than fatal, unless a hook opts in.
-	hres, hookErr = hooks.Run(ctx, repo.Dir(), hooks.AfterRelease, cfg.Hooks.For(hooks.AfterRelease), hctx, log)
+	hres, hookErr = hooks.Run(ctx, repo.Dir(), hooks.AfterRelease, cfg.Hooks.For(hooks.AfterRelease), hctx, repo.Mask, log)
 	rep.Hooks = append(rep.Hooks, hres...)
 	if len(hres) > 0 {
 		st := StepDone
@@ -438,7 +441,7 @@ func commitChangelog(repo *git.Repo, cfg *config.Config, res *analyze.Result, o 
 			return StepFailed, err.Error(), "", err
 		}
 	}
-	pushURL, err := authenticatedURL(repo, o.remote(), o.Token, o.forgeKind())
+	pushURL, err := pushURL(repo, o.remote(), o.Token, o.forgeKind())
 	if err != nil {
 		return StepFailed, err.Error(), "", err
 	}
@@ -708,23 +711,29 @@ func firstNonEmpty(vals ...string) string {
 	return ""
 }
 
-// authenticatedURL returns a push URL carrying the job token. The token is
-// registered as a secret first, so it cannot appear in an error message.
-func authenticatedURL(repo *git.Repo, remote, token string, kind forge.Kind) (string, error) {
+// pushURL returns the remote's URL with any embedded credentials removed and
+// the token registered as a git credential instead. A token in the URL is a
+// token in the argument list, which every process in the container can read;
+// the credential helper hands it over through the environment.
+func pushURL(repo *git.Repo, remote, token string, kind forge.Kind) (string, error) {
 	raw, err := repo.RemoteURL(remote)
 	if err != nil {
 		return "", err
 	}
-	if token == "" || !strings.HasPrefix(raw, "https://") {
+	if !strings.HasPrefix(raw, "https://") {
 		return raw, nil
 	}
 	rest := strings.TrimPrefix(raw, "https://")
 	if i := strings.IndexByte(rest, '@'); i >= 0 {
-		rest = rest[i+1:] // replace any credentials already present
+		// Credentials the runner put there belong to the runner's own clone;
+		// masking them is enough, the helper carries ours.
+		repo.AddSecret(rest[:i])
+		rest = rest[i+1:]
 	}
-	url := "https://" + forge.PushCredentials(kind, token) + "@" + rest
-	repo.AddSecret(url)
-	return url, nil
+	if token != "" {
+		repo.UseCredential(forge.PushCredential(kind, token))
+	}
+	return "https://" + rest, nil
 }
 
 // Signing key formats. Which one a key is gets detected from the material
@@ -862,31 +871,68 @@ func configureSSHSigning(repo *git.Repo, key string) (func(), error) {
 	return cleanup, nil
 }
 
-// configureGPGSigning imports an armoured key into the ambient keyring and
-// selects it. The keyring is the job's own and disappears with the container.
+// configureGPGSigning imports an armoured key into a keyring of its own and
+// points git at it. The keyring is a private temp directory -- GNUPGHOME for
+// this run only -- so the key never lands in whatever keyring the machine's
+// user keeps, and disappears with the run, symmetric with the SSH path.
 func configureGPGSigning(repo *git.Repo, key string) (func(), error) {
-	imp := exec.Command("gpg", "--batch", "--import")
-	imp.Stdin = strings.NewReader(key)
-	if out, err := imp.CombinedOutput(); err != nil {
-		return nil, fmt.Errorf("importing the signing key: %w: %s", err, out)
-	}
-	keyID, err := firstSecretKeyID()
+	home, err := os.MkdirTemp(shortTempDir(), "yasrt-gnupg-")
 	if err != nil {
 		return nil, err
 	}
+	if err := os.Chmod(home, 0o700); err != nil {
+		_ = os.RemoveAll(home)
+		return nil, err
+	}
+	env := append(os.Environ(), "GNUPGHOME="+home)
+	cleanup := func() {
+		// The agent holds the key material in memory; stop it before the
+		// directory goes, or it lingers with a socket that no longer exists.
+		kill := exec.Command("gpgconf", "--kill", "gpg-agent")
+		kill.Env = env
+		_ = kill.Run()
+		_ = os.RemoveAll(home)
+	}
+
+	imp := exec.Command("gpg", "--batch", "--import")
+	imp.Env = env
+	imp.Stdin = strings.NewReader(key)
+	if out, err := imp.CombinedOutput(); err != nil {
+		cleanup()
+		return nil, fmt.Errorf("importing the signing key: %w: %s", err, out)
+	}
+	keyID, err := firstSecretKeyID(env)
+	if err != nil {
+		cleanup()
+		return nil, err
+	}
+	repo.SetEnv("GNUPGHOME", home)
 	for _, kv := range [][2]string{
 		{"gpg.format", "openpgp"},
 		{"user.signingkey", keyID},
 	} {
 		if err := repo.Config(kv[0], kv[1]); err != nil {
+			cleanup()
 			return nil, err
 		}
 	}
-	return func() {}, nil
+	return cleanup, nil
 }
 
-func firstSecretKeyID() (string, error) {
-	out, err := exec.Command("gpg", "--list-secret-keys", "--with-colons").Output()
+// shortTempDir prefers /tmp where it exists: gpg-agent's socket lives inside
+// GNUPGHOME and a Unix socket path is limited to about a hundred characters,
+// which macOS's per-user temp directory alone nearly exhausts.
+func shortTempDir() string {
+	if st, err := os.Stat("/tmp"); err == nil && st.IsDir() {
+		return "/tmp"
+	}
+	return os.TempDir()
+}
+
+func firstSecretKeyID(env []string) (string, error) {
+	list := exec.Command("gpg", "--list-secret-keys", "--with-colons")
+	list.Env = env
+	out, err := list.Output()
 	if err != nil {
 		return "", fmt.Errorf("listing secret keys: %w", err)
 	}

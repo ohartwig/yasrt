@@ -177,10 +177,11 @@ func probePushPermission(repo *git.Repo, remote string, kind forge.Kind, token s
 	if token != "" && strings.HasPrefix(url, "https://") {
 		rest := strings.TrimPrefix(url, "https://")
 		if i := strings.IndexByte(rest, '@'); i >= 0 {
+			repo.AddSecret(rest[:i])
 			rest = rest[i+1:]
 		}
-		url = "https://" + forge.PushCredentials(kind, token) + "@" + rest
-		repo.AddSecret(url)
+		url = "https://" + rest
+		repo.UseCredential(forge.PushCredential(kind, token))
 	}
 
 	head, err := repo.HeadSHA()

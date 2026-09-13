@@ -156,17 +156,17 @@ func (u URLs) Change(number string) string {
 	}
 }
 
-// PushCredentials returns the user:password pair that carries a token in a
-// push URL. Each platform expects its own username, and using the wrong one
-// fails as an authentication error rather than as a clear message.
-func PushCredentials(k Kind, token string) string {
+// PushCredential returns the user name and password git presents when it
+// pushes with a token. Each platform expects its own pairing, and the wrong
+// one fails as an authentication error rather than as a clear message.
+func PushCredential(k Kind, token string) (user, password string) {
 	switch k {
 	case GitHub:
-		return "x-access-token:" + token
+		return "x-access-token", token
 	case Forgejo:
-		// Forgejo accepts the token as the username with any password.
-		return token + ":x-oauth-basic"
+		// Forgejo takes the token as the user name, with any password.
+		return token, "x-oauth-basic"
 	default:
-		return "gitlab-ci-token:" + token
+		return "gitlab-ci-token", token
 	}
 }

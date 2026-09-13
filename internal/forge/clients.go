@@ -50,6 +50,16 @@ type rest struct {
 }
 
 func (r *rest) do(ctx context.Context, method, path string, body, out any) error {
+	return r.doWithCheck(ctx, method, path, body, out, nil)
+}
+
+// doWithCheck is do with one addition for requests that create something: a
+// server error or a timeout on a POST does not say whether the thing was
+// created. Before retrying, `settled` is asked; if it reports the request as
+// done, the retry is skipped and the earlier error forgotten. Without this a
+// release that was created on the first try answers the second with 409 and
+// a release that exists is reported as a failure.
+func (r *rest) doWithCheck(ctx context.Context, method, path string, body, out any, settled func(context.Context) (bool, error)) error {
 	tries := r.tries
 	if tries <= 0 {
 		tries = 3
@@ -79,9 +89,19 @@ func (r *rest) do(ctx context.Context, method, path string, body, out any) error
 		case <-time.After(wait):
 		}
 		wait *= 2
+		if settled != nil {
+			done, checkErr := settled(ctx)
+			if checkErr == nil && done {
+				return errAlreadySettled
+			}
+		}
 	}
 	return last
 }
+
+// errAlreadySettled says the request took effect before a retry was needed;
+// the caller reads the result back instead of retrying.
+var errAlreadySettled = errors.New("request already took effect")
 
 func (r *rest) attempt(ctx context.Context, method, path string, body, out any) error {
 	var rdr io.Reader
@@ -237,7 +257,13 @@ func (c *gitlabClient) CreateRelease(ctx context.Context, tag, name, body string
 		Description string `json:"description,omitzero"`
 	}{tag, name, body}
 	var out glRelease
-	if err := c.rest.do(ctx, http.MethodPost, c.path("releases"), req, &out); err != nil {
+	exists := func(ctx context.Context) (bool, error) { _, ok, err := c.GetRelease(ctx, tag); return ok, err }
+	err := c.rest.doWithCheck(ctx, http.MethodPost, c.path("releases"), req, &out, exists)
+	if errors.Is(err, errAlreadySettled) {
+		rel, _, getErr := c.GetRelease(ctx, tag)
+		return rel, getErr
+	}
+	if err != nil {
 		return nil, err
 	}
 	return &Release{TagName: out.TagName, Name: out.Name, URL: out.Links.Self}, nil
@@ -373,7 +399,13 @@ func (c *ghClient) CreateRelease(ctx context.Context, tag, name, body string) (*
 		Body    string `json:"body,omitzero"`
 	}{tag, name, body}
 	var out ghRelease
-	if err := c.rest.do(ctx, http.MethodPost, c.path(""), req, &out); err != nil {
+	exists := func(ctx context.Context) (bool, error) { _, ok, err := c.GetRelease(ctx, tag); return ok, err }
+	err := c.rest.doWithCheck(ctx, http.MethodPost, c.path(""), req, &out, exists)
+	if errors.Is(err, errAlreadySettled) {
+		rel, _, getErr := c.GetRelease(ctx, tag)
+		return rel, getErr
+	}
+	if err != nil {
 		return nil, err
 	}
 	return out.release(), nil

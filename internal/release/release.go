@@ -866,31 +866,68 @@ func configureSSHSigning(repo *git.Repo, key string) (func(), error) {
 	return cleanup, nil
 }
 
-// configureGPGSigning imports an armoured key into the ambient keyring and
-// selects it. The keyring is the job's own and disappears with the container.
+// configureGPGSigning imports an armoured key into a keyring of its own and
+// points git at it. The keyring is a private temp directory -- GNUPGHOME for
+// this run only -- so the key never lands in whatever keyring the machine's
+// user keeps, and disappears with the run, symmetric with the SSH path.
 func configureGPGSigning(repo *git.Repo, key string) (func(), error) {
-	imp := exec.Command("gpg", "--batch", "--import")
-	imp.Stdin = strings.NewReader(key)
-	if out, err := imp.CombinedOutput(); err != nil {
-		return nil, fmt.Errorf("importing the signing key: %w: %s", err, out)
-	}
-	keyID, err := firstSecretKeyID()
+	home, err := os.MkdirTemp(shortTempDir(), "yasrt-gnupg-")
 	if err != nil {
 		return nil, err
 	}
+	if err := os.Chmod(home, 0o700); err != nil {
+		_ = os.RemoveAll(home)
+		return nil, err
+	}
+	env := append(os.Environ(), "GNUPGHOME="+home)
+	cleanup := func() {
+		// The agent holds the key material in memory; stop it before the
+		// directory goes, or it lingers with a socket that no longer exists.
+		kill := exec.Command("gpgconf", "--kill", "gpg-agent")
+		kill.Env = env
+		_ = kill.Run()
+		_ = os.RemoveAll(home)
+	}
+
+	imp := exec.Command("gpg", "--batch", "--import")
+	imp.Env = env
+	imp.Stdin = strings.NewReader(key)
+	if out, err := imp.CombinedOutput(); err != nil {
+		cleanup()
+		return nil, fmt.Errorf("importing the signing key: %w: %s", err, out)
+	}
+	keyID, err := firstSecretKeyID(env)
+	if err != nil {
+		cleanup()
+		return nil, err
+	}
+	repo.SetEnv("GNUPGHOME", home)
 	for _, kv := range [][2]string{
 		{"gpg.format", "openpgp"},
 		{"user.signingkey", keyID},
 	} {
 		if err := repo.Config(kv[0], kv[1]); err != nil {
+			cleanup()
 			return nil, err
 		}
 	}
-	return func() {}, nil
+	return cleanup, nil
 }
 
-func firstSecretKeyID() (string, error) {
-	out, err := exec.Command("gpg", "--list-secret-keys", "--with-colons").Output()
+// shortTempDir prefers /tmp where it exists: gpg-agent's socket lives inside
+// GNUPGHOME and a Unix socket path is limited to about a hundred characters,
+// which macOS's per-user temp directory alone nearly exhausts.
+func shortTempDir() string {
+	if st, err := os.Stat("/tmp"); err == nil && st.IsDir() {
+		return "/tmp"
+	}
+	return os.TempDir()
+}
+
+func firstSecretKeyID(env []string) (string, error) {
+	list := exec.Command("gpg", "--list-secret-keys", "--with-colons")
+	list.Env = env
+	out, err := list.Output()
 	if err != nil {
 		return "", fmt.Errorf("listing secret keys: %w", err)
 	}

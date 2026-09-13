@@ -47,7 +47,13 @@ type Repo struct {
 	// through the URL or the argument list: those are visible to every
 	// process in the container, the environment only to the same user.
 	credUser, credToken string
+	// extraEnv is added to every git command -- for GNUPGHOME, so that git's
+	// own gpg child looks in the same private keyring this run imported into.
+	extraEnv []string
 }
+
+// SetEnv adds a variable to the environment of every following git command.
+func (r *Repo) SetEnv(key, value string) { r.extraEnv = append(r.extraEnv, key+"="+value) }
 
 // credentialEnv names the variables the helper reads.
 const (
@@ -139,6 +145,7 @@ func (r *Repo) runFull(args ...string) (string, string, error) {
 		"GIT_ADVICE=0",
 		"LC_ALL=C",
 	)
+	env = append(env, r.extraEnv...)
 	if r.credToken != "" {
 		args = append([]string{
 			"-c", "credential.helper=",

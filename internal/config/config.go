@@ -36,10 +36,18 @@ const (
 	ProductCustom    Product = "custom"
 )
 
-// ReleaseScope is the commit scope yasrt uses for its own release commit. It is
-// always ignored during analysis and cannot be configured away: it is the
-// second of the three loop guards (SPEC §6.3).
+// ReleaseScope is the commit scope yasrt uses for its own release commit,
+// chore(release). That commit is always ignored during analysis and cannot be
+// configured away: it is the second of the three loop guards (SPEC §6.3).
+// Only that commit -- the scope alone is not reserved, so a feat(release) in a
+// repository whose subject happens to be releasing still counts.
 const ReleaseScope = "release"
+
+// IsReleaseCommit reports whether a commit of this type and scope is the one
+// yasrt writes itself.
+func IsReleaseCommit(typ, scope string) bool {
+	return strings.EqualFold(typ, "chore") && strings.EqualFold(scope, ReleaseScope)
+}
 
 // DefaultReleaseAuthor is the identity release commits are made under when
 // neither the repository nor a defaults layer names one. A placeholder on a
@@ -396,11 +404,12 @@ func (c *Config) applyDefaults() {
 	if c.Rules == nil {
 		c.Rules = DefaultRules()
 	}
-	// Loop guard 2: our own chore(release) commit must never produce a bump.
-	if !slices.ContainsFunc(c.Ignore.Scopes, func(s string) bool {
-		return strings.EqualFold(s, ReleaseScope)
-	}) {
-		c.Ignore.Scopes = append(c.Ignore.Scopes, ReleaseScope)
+	// Loop guard 2 -- our own chore(release) commit never bumps -- is enforced
+	// in the rule evaluation, not by seeding ignore.scopes: the scope alone
+	// would swallow a feat(release) too. Whoever lists the scope here still
+	// gets the broader behaviour.
+	if c.Ignore.Scopes == nil {
+		c.Ignore.Scopes = []string{}
 	}
 	if c.Ignore.Trailers == nil {
 		c.Ignore.Trailers = []string{"skip release", "release skip"}

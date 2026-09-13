@@ -118,7 +118,19 @@ func TestReleaseScopeIsIgnored(t *testing.T) {
 	if d.Bump != semver.None {
 		t.Fatalf("Bump = %v — the release commit must never trigger a release", d.Bump)
 	}
-	if len(d.Ignored) != 1 || d.Ignored[0].Reason != IgnoredByScope {
+	if len(d.Ignored) != 1 || d.Ignored[0].Reason != IgnoredByRelease {
+		t.Errorf("Ignored = %+v", d.Ignored)
+	}
+}
+
+// The scope alone is not reserved: work on a release feature is work.
+func TestReleaseScopeOnItsOwnCounts(t *testing.T) {
+	c := cfg(t, "product: image\n")
+	d := Evaluate(commits("feat(release): triggers expand the ref"), c)
+	if d.Bump != semver.Minor {
+		t.Fatalf("Bump = %v, want minor: feat(release) is not the release commit", d.Bump)
+	}
+	if len(d.Ignored) != 0 {
 		t.Errorf("Ignored = %+v", d.Ignored)
 	}
 }

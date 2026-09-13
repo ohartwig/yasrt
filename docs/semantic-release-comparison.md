@@ -43,7 +43,7 @@ available, with the reason · **+** yasrt only.
 | `releaseRules` | `rules[]` with `type`, `scope`, `breaking`, `release` | ≈ Same first-match-wins evaluation. semantic-release can match any commit property (`subject`, `tag`, custom); yasrt matches type, scope and the breaking flag — the three that appear in every `releaseRules` in the estate. |
 | `presetConfig` | — | ✗ Preset concept absent. |
 | default rules | breaking → major, `feat` → minor, `fix`/`perf`/`revert` → patch | ✓ Same as the `conventionalcommits` preset. An organisation that ships dependency bumps adds `chore → patch` in its shared defaults; the rules list replaces rather than merges. |
-| — | `ignore.scopes` (always contains `release`) | + Loop guard; not configurable away. |
+| — | `ignore.scopes`, and the `chore(release)` commit always ignored | + Loop guard; not configurable away. |
 | — | `ignore.authors` | + Skip commits by author, e.g. a bot. |
 | — | `ignore.trailers` (`skip release`, `release skip`) | + Per-commit opt-out. |
 | — | `deliverability.non_release_paths`, `extra_non_release_paths` | + A change touching only these paths is not a release. semantic-release has no equivalent; the old component bolted it on in shell, against the wrong commit range (I-081). |

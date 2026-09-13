@@ -142,7 +142,7 @@ rules:
   # in its shared defaults file.
 
 ignore:                    # public request #7
-  scopes: [release]        # mandatory default: our own release commit
+  scopes: []               # our own chore(release) commit is always ignored, scope or not
   authors: []              # e.g. ["renovate-bot"]
   trailers: ["skip release", "release skip"]   # #5, [skip release] in body
 
@@ -418,7 +418,7 @@ Rationale for the order: steps 3–5 are individually idempotent; a re-run after
 Three independent safeguards:
 
 1. **Transport:** pushes with `CI_JOB_TOKEN` do not trigger pipelines in GitLab. This is the primary guard and needs no configuration.
-2. **Analysis:** `ignore.scopes` contains `release`; our own `chore(release): x.y.z` commit produces no bump. Cannot be disabled (the tool enforces the entry).
+2. **Analysis:** our own `chore(release): x.y.z` commit produces no bump — recognised by type *and* scope, so a `feat(release)` still counts. Cannot be disabled (the tool enforces it in the rule evaluation, not through `ignore.scopes`).
 3. **Path:** `CHANGELOG.md` is a `non_release_path` in every `product` derivation.
 
 Today's `rules:changes` guard in `.gitlab-ci.yml` is dropped.

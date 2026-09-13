@@ -117,22 +117,26 @@ func TestNonReleasePathsOverrideAndExtend(t *testing.T) {
 	}
 }
 
-// Loop guard 2 (SPEC §6.3): the release scope is enforced, not merely defaulted.
-func TestReleaseScopeAlwaysIgnored(t *testing.T) {
-	for _, src := range []string{
-		"product: image\n",
-		"product: image\nignore:\n  scopes: [deps]\n",
-		"product: image\nignore:\n  scopes: []\n",
+// Loop guard 2 (SPEC §6.3): the release commit is recognised by type and
+// scope, and the scope alone is not reserved.
+func TestReleaseCommitRecognised(t *testing.T) {
+	for _, tc := range []struct {
+		typ, scope string
+		want       bool
+	}{
+		{"chore", "release", true},
+		{"Chore", "Release", true},
+		{"feat", "release", false},
+		{"chore", "deps", false},
+		{"chore", "", false},
 	} {
-		c := load(t, src)
-		if !slices.Contains(c.Ignore.Scopes, "release") {
-			t.Errorf("%q: release scope must be present, got %q", src, c.Ignore.Scopes)
+		if got := IsReleaseCommit(tc.typ, tc.scope); got != tc.want {
+			t.Errorf("IsReleaseCommit(%q, %q) = %v, want %v", tc.typ, tc.scope, got, tc.want)
 		}
 	}
-	// Already present in another case: not duplicated.
-	c := load(t, "product: image\nignore:\n  scopes: [Release]\n")
-	if len(c.Ignore.Scopes) != 1 {
-		t.Errorf("scopes = %q, want no duplicate", c.Ignore.Scopes)
+	c := load(t, "product: image\nignore:\n  scopes: [deps]\n")
+	if !slices.Equal(c.Ignore.Scopes, []string{"deps"}) {
+		t.Errorf("scopes = %q, want only what was configured", c.Ignore.Scopes)
 	}
 }
 
@@ -218,7 +222,7 @@ rules:
   - type: fix
     release: patch
 ignore:
-  scopes: [release]
+  scopes: []
   authors: []
   trailers: ["skip release", "release skip"]
 deliverability:

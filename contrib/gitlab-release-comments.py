@@ -74,6 +74,11 @@ def main() -> int:
         return 0
     api = os.environ["CI_API_V4_URL"]
     pid = os.environ["CI_PROJECT_ID"]
+    if not api.startswith("https://"):
+        # The only URL this script builds on is the one GitLab hands the job;
+        # urllib would also open file:// and the like, so hold it to HTTPS.
+        print(f"refusing a non-HTTPS API base: {api}")
+        return 0
 
     def call(path: str, data: dict | None = None):
         body = None if data is None else urllib.parse.urlencode(data).encode()
@@ -81,6 +86,7 @@ def main() -> int:
             f"{api}/projects/{pid}/{path}", data=body,
             headers={"PRIVATE-TOKEN": token}, method="POST" if data is not None else "GET",
         )
+        # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected -- base is CI_API_V4_URL, checked to be HTTPS above; the path is ours
         with urllib.request.urlopen(req, timeout=30) as r:
             return json.load(r)
 

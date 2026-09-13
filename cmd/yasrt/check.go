@@ -144,7 +144,9 @@ func cmdCheck(args []string) error {
 	switch {
 	case env.Kind != forge.GitLab && env.Kind != "":
 		add("release authority", true, false, fmt.Sprintf(
-			"not probed on %s; make sure the token may create tags matching %s", env.Kind, cfgTagFormat(cfg)))
+			"not probed on %s: check by hand that the workflow token may create tags matching %s "+
+				"(GitHub: a ruleset or tag protection that admits GITHUB_TOKEN with contents: write; "+
+				"Forgejo: tag protection that admits the token's user)", env.Kind, cfgTagFormat(cfg)))
 	case env.APIURL != "" && env.Repo != "" && token != "" && cfg != nil:
 		out = append(out, probeReleaseAuthority(
 			gitlab.New(env.APIURL, env.Repo, token), cfg,

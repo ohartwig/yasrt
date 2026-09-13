@@ -202,6 +202,9 @@ release:
 # about publishing the project, not about releasing it.
 mirror:github:
   stage: .post
+  # github.com has no IPv6 and the spot fleet no public IPv4; this runner
+  # has both, which is why the image builds run there too.
+  tags: [az1a]
   needs:
     - job: release
       optional: true

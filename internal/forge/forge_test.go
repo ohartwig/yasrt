@@ -129,14 +129,14 @@ func TestURLShapes(t *testing.T) {
 	}
 }
 
-func TestPushCredentials(t *testing.T) {
-	for kind, want := range map[forge.Kind]string{
-		forge.GitLab:  "gitlab-ci-token:tok",
-		forge.GitHub:  "x-access-token:tok",
-		forge.Forgejo: "tok:x-oauth-basic",
+func TestPushCredential(t *testing.T) {
+	for kind, want := range map[forge.Kind][2]string{
+		forge.GitLab:  {"gitlab-ci-token", "tok"},
+		forge.GitHub:  {"x-access-token", "tok"},
+		forge.Forgejo: {"tok", "x-oauth-basic"},
 	} {
-		if got := forge.PushCredentials(kind, "tok"); got != want {
-			t.Errorf("%s = %q, want %q", kind, got, want)
+		if u, p := forge.PushCredential(kind, "tok"); u != want[0] || p != want[1] {
+			t.Errorf("%s = %q/%q, want %q/%q", kind, u, p, want[0], want[1])
 		}
 	}
 }

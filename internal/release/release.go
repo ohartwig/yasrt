@@ -311,7 +311,7 @@ func run(ctx context.Context, o Options, log *slog.Logger) (*Report, error) {
 		rep.Steps = append(rep.Steps, Step{Name: "changelog", Status: StepSkipped, Detail: "release_commit disabled"})
 	}
 
-	pushURL, err := authenticatedURL(repo, o.remote(), o.Token, o.forgeKind())
+	pushURL, err := pushURL(repo, o.remote(), o.Token, o.forgeKind())
 	if err != nil {
 		return rep, err
 	}
@@ -438,7 +438,7 @@ func commitChangelog(repo *git.Repo, cfg *config.Config, res *analyze.Result, o 
 			return StepFailed, err.Error(), "", err
 		}
 	}
-	pushURL, err := authenticatedURL(repo, o.remote(), o.Token, o.forgeKind())
+	pushURL, err := pushURL(repo, o.remote(), o.Token, o.forgeKind())
 	if err != nil {
 		return StepFailed, err.Error(), "", err
 	}
@@ -703,23 +703,29 @@ func firstNonEmpty(vals ...string) string {
 	return ""
 }
 
-// authenticatedURL returns a push URL carrying the job token. The token is
-// registered as a secret first, so it cannot appear in an error message.
-func authenticatedURL(repo *git.Repo, remote, token string, kind forge.Kind) (string, error) {
+// pushURL returns the remote's URL with any embedded credentials removed and
+// the token registered as a git credential instead. A token in the URL is a
+// token in the argument list, which every process in the container can read;
+// the credential helper hands it over through the environment.
+func pushURL(repo *git.Repo, remote, token string, kind forge.Kind) (string, error) {
 	raw, err := repo.RemoteURL(remote)
 	if err != nil {
 		return "", err
 	}
-	if token == "" || !strings.HasPrefix(raw, "https://") {
+	if !strings.HasPrefix(raw, "https://") {
 		return raw, nil
 	}
 	rest := strings.TrimPrefix(raw, "https://")
 	if i := strings.IndexByte(rest, '@'); i >= 0 {
-		rest = rest[i+1:] // replace any credentials already present
+		// Credentials the runner put there belong to the runner's own clone;
+		// masking them is enough, the helper carries ours.
+		repo.AddSecret(rest[:i])
+		rest = rest[i+1:]
 	}
-	url := "https://" + forge.PushCredentials(kind, token) + "@" + rest
-	repo.AddSecret(url)
-	return url, nil
+	if token != "" {
+		repo.UseCredential(forge.PushCredential(kind, token))
+	}
+	return "https://" + rest, nil
 }
 
 // Signing key formats. Which one a key is gets detected from the material

@@ -40,8 +40,17 @@ in [docs/semantic-release-comparison.md](docs/semantic-release-comparison.md).
 ## Install
 
 **Binary.** Every release ships `yasrt-linux-{amd64,arm64}` and `yasrt-darwin-{arm64,amd64}`
-with a `SHA256SUMS` on the release page. Linux and macOS are supported;
-Windows is not.
+with a `SHA256SUMS` and a detached cosign signature over it on the
+[release page](https://github.com/ohartwig/yasrt/releases). The binaries are
+built and signed once, in the author's pipeline, and the same files are
+published on GitHub — nothing is rebuilt there. Linux and macOS are
+supported; Windows is not.
+
+```sh
+cosign verify-blob --key <public-key> --signature SHA256SUMS.sig \
+  --insecure-ignore-tlog=true SHA256SUMS
+sha256sum -c SHA256SUMS
+```
 
 **Go.**
 

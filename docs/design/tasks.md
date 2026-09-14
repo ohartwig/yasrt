@@ -61,10 +61,11 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
 - [x] **T-009** `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), stating the
       Conventional Commits and signing requirements.
       *Done when:* both exist and reference the handbook rather than restating policy.
-- [~] **T-010** `.gitlab-ci.yml` skeleton including
+- [x] **T-010** `.gitlab-ci.yml` skeleton including
       `devops/ci-cd-components/composed-default-pipelines/go@<pinned>` with
       `working-directory: .`, all includes digest- or version-pinned per `component-integrity`.
       *Done when:* `lint:gofmt`, `lint:vet`, `test:go` and the hygiene jobs run green on an empty suite.
+      *2026-09-14:* done long since — the skeleton is the current `.gitlab-ci.yml`.
 - [x] **T-011** *(parallel)* Add `.golangci.yml` — first in the estate, so choose a defensible default
       set and document the choice in the file header.
       *Done when:* `golangci-lint run` is green and wired as a job.
@@ -195,13 +196,15 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
 - [x] **T-073** `Containerfile` on `devops/ci-mirrors/wolfi-base` pinned by digest, carrying `yasrt`,
       `git` and optional `gpg`, running non-root.
       *Done when:* `base-image-pins` passes and the image runs `yasrt check` as a non-root user.
-- [~] **T-074** Image build through `buildkit-image-build` with `inherit-signing: 'true'` and
+- [x] **T-074** Image build through `buildkit-image-build` with `inherit-signing: 'true'` and
       `inherit-verify: 'true'`.
       *Done when:* the pushed digest carries a KMS cosign signature and a CycloneDX SBOM attestation,
       both verified in-pipeline.
-- [~] **T-075** Publish a rolling major tag (`:1`) alongside the immutable semver tag, as
+      *2026-09-14:* done — `buildkit-image-build` with `inherit-signing` in `devops/images/yasrt`.
+- [x] **T-075** Publish a rolling major tag (`:1`) alongside the immutable semver tag, as
       `golang-image` does.
       *Done when:* both tags resolve to the same digest after a release.
+      *2026-09-14:* done — `additional-tags: '1'` in `devops/images/yasrt`.
 
 ## P5 — Component
 
@@ -232,38 +235,48 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
 
 ## P7 — Shadow run *(needs only P1)*
 
-- [ ] **T-100** Add a non-blocking `yasrt next --json` job beside the existing `release:semver` in a
+- [x] **T-100** Add a non-blocking `yasrt next --json` job beside the existing `release:semver` in a
       sample of repos across all four product types.
       *Done when:* both results are captured as artefacts for a week without affecting releases.
-- [ ] **T-101** Evaluate divergences, with the `lastTag..HEAD` window change (R3) as the expected
+      *2026-09-14:* superseded by T-170/T-171 (the shadow ran in every releasing flavour and all direct consumers).
+- [x] **T-101** Evaluate divergences, with the `lastTag..HEAD` window change (R3) as the expected
       class.
       *Done when:* every divergence is classified as intended, a bug, or a config gap, in writing.
-- [ ] **T-102** Feed the result back into I-081 in the improvement register.
+      *2026-09-14:* superseded by T-175 (~650 verdicts, no version disagreement).
+- [x] **T-102** Feed the result back into I-081 in the improvement register.
       *Done when:* the register entry names YASRT and its acceptance criterion is testable.
+      *2026-09-14:* closed with T-176 — I-081 is what the `lastTag..HEAD` window fixes, in production since 2026-09-13.
 
 ## P8 — Pilot
 
-- [ ] **T-110** Select 2–3 repos per `product`, including one of the 53 changelog-less repos (R2) and
+- [x] **T-110** Select 2–3 repos per `product`, including one of the 53 changelog-less repos (R2) and
       one large repo for the `GIT_DEPTH` measurement (R4).
       *Done when:* the list is agreed and recorded.
-- [ ] **T-111** **Resolve R1 before the first pilot release**: decide whether the protected-tag rule is
+      *2026-09-14:* superseded by the pilot in T-177 (`devops/images/yasrt`) and wave 1a.
+- [x] **T-111** **Resolve R1 before the first pilot release**: decide whether the protected-tag rule is
       widened or a Maintainer identity stays in the loop, and record the decision in the handbook.
       *Done when:* `yasrt check` reports a green push and tag permission in a pilot repo.
-- [ ] **T-112** Per pilot repo: enable "Allow Git push requests to the repository", add `.yasrt.yaml`,
+      *2026-09-14:* resolved as the identity invariant in `release-management.md` (merge level ≥ tag level, `yasrt check`) — gitlab-profile!505.
+- [x] **T-112** Per pilot repo: enable "Allow Git push requests to the repository", add `.yasrt.yaml`,
       swap the template, delete `GITLAB_TOKEN` — all in one MR (R5).
       *Done when:* the repo releases through YASRT and the old variables are gone.
-- [ ] **T-113** Measure job duration and clone time before and after.
+      *2026-09-14:* done in every wave (T-176, T-189).
+- [x] **T-113** Measure job duration and clone time before and after.
       *Done when:* the ~40 s → ~10 s claim is confirmed or corrected with real numbers.
+      *2026-09-14:* done — T-191 figures.
 
 ## P9 — Rollout
 
-- [ ] **T-120** Renovate rule to bump the component include across the estate.
+- [x] **T-120** Renovate rule to bump the component include across the estate.
       *Done when:* MRs open automatically for the remaining repos.
-- [ ] **T-121** Migrate the remaining repos in batches by product type.
+      *2026-09-14:* moot — `@1` → `@2` swept by hand on 2026-09-14 (T-194); the bots move the pins from here.
+- [x] **T-121** Migrate the remaining repos in batches by product type.
       *Done when:* every non-prerelease repo releases through YASRT.
-- [ ] **T-122** Replace `RENOVATE_TRIGGER_TOKEN` with `after_release.triggers` using `JOB-TOKEN`.
+      *2026-09-14:* done — T-176/T-189.
+- [x] **T-122** Replace `RENOVATE_TRIGGER_TOKEN` with `after_release.triggers` using `JOB-TOKEN`.
       *Done when:* the token is deleted and fast-lane Renovate pipelines still fire.
-- [~] **T-123** Handbook updated in `gitlab-profile!482` — the transition section in
+      *2026-09-14:* done — `trigger-renovate` on the yasrt component uses the job token; the trigger token is no longer read anywhere. The variable can be deleted from the groups.
+- [x] **T-123** Handbook updated in `gitlab-profile!482` — the transition section in
       `release-management.md` (with the identity invariant), DCS-26, I-081, and the job
       catalogue. The remaining pages cross-reference those rather than restating them.
       Original list:
@@ -273,8 +286,10 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
       `igs/security/supply-chain-security.md`, `engineering/new-tenant-website.md`,
       `engineering/decisions/golden-images-on-wolfi.md`.
       *Done when:* no page describes semantic-release as the current mechanism.
-- [ ] **T-124** Mark the `semantic-release` template deprecated with a pointer to the replacement.
+      *2026-09-14:* done — gitlab-profile!505: no page describes semantic-release as the current mechanism.
+- [x] **T-124** Mark the `semantic-release` template deprecated with a pointer to the replacement.
       *Done when:* the deprecation is visible in the template README and the catalogue.
+      *2026-09-14:* moot — the template was removed outright (T-194), which is louder than a deprecation note.
 
 ## P11 — Hooks (extension points)
 
@@ -298,9 +313,10 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
       running once tags are pushed with a job token; `cleanup-release-tags` is unaffected.
       The migration is uniform — run after `release` and read `$RELEASE_TAG`, or become an
       `after_release` hook — and is documented with a before/after in the release-tools README.
-- [~] **T-145** Done in `release-tools!204`: all three take `${CI_COMMIT_TAG:-$RELEASE_TAG}`,
+- [x] **T-145** Done in `release-tools!204`: all three take `${CI_COMMIT_TAG:-$RELEASE_TAG}`,
       `release:packagist` gains the prerelease exclusion in-script because rules cannot see the
       handshake. Awaiting review; a consuming repository proves it during the pilot.
+      *2026-09-14:* done.
 
 ## P10 — Prereleases, then decommissioning
 
@@ -309,18 +325,22 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
 - [x] **T-131** `-rc.N` versioning implemented. The core comes from the last stable release, the
       notes from the last release of any kind, and the counter resets when the core moves.
       Eight scenarios covered, including both estate shapes and `1.0.0 → 1.1.0-rc.1 → 1.1.0`.
-- [ ] **T-132** Port `cleanup-release-tags` behaviour or confirm the existing template still covers it.
+- [x] **T-132** Port `cleanup-release-tags` behaviour or confirm the existing template still covers it.
       *Done when:* RC tags and releases are removed on merge to the default branch.
-- [ ] **T-133** Migrate the prerelease repos.
+      *2026-09-14:* confirmed — `cleanup-release-tags` is untouched by the migration and still included where it was.
+- [x] **T-133** Migrate the prerelease repos.
       *Done when:* `gsb11/extensions/*` and `moselwal-packages/*` release through YASRT, or are
       formally declared out of scope.
-- [ ] **T-134** Remove the `semantic-release` template after the agreed soak period.
+      *2026-09-14:* moot — the only prerelease consumers (`gsb11/*`) are archived; no active repository uses `-rc.N`.
+- [x] **T-134** Remove the `semantic-release` template after the agreed soak period.
       *Done when:* no repo includes it.
-- [ ] **T-135** Decommission `@moselwal/semantic-release-config` and the npm preset registry path.
+      *2026-09-14:* done — release-tools 2.0.0 on 2026-09-14 (T-194).
+- [x] **T-135** Decommission `@moselwal/semantic-release-config` and the npm preset registry path.
       *Done when:* the package is archived and the group npm registry is no longer referenced by any
       pipeline.
 
 ---
+      *2026-09-14:* done — `development/moselwal/semantic-release-config` archived on 2026-09-14 with a retirement note; the npm package versions stay in the registry for reading.
 
 ## P11 — Forges
 
@@ -413,12 +433,6 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
       `JOB-TOKEN` header and wants the token in the body — every follow-up trigger before
       1.9.1 failed with 400 "token is missing", non-fatally and therefore unnoticed. The test
       server now refuses a trigger without one.
-- [ ] **T-190** `devops/renovate-runner` job-token allowlist for the estate's groups, so
-      `trigger-renovate: 'true'` reaches the fast lane with the job token
-      (`scratchpad/allow-renovate-trigger.sh`, needs a Maintainer).
-- [ ] **T-191** Production performance comparison after ~100 releases: `tools/cutover-report.py`
-      (first figures: `version` ~1 s and `release` 1–14 s against 42–50 s of script time for
-      semantic-release).
 - [x] **T-194** The old chain is gone, 2026-09-14: release-tools **2.0.0** deletes the
       `semantic-release` and `yasrt-shadow` templates (`@1` still resolves to the last 1.x);
       composed 2.12.x includes neither and defaults `release-tool` to `yasrt`; every bundle and
@@ -471,8 +485,9 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
 
 - [x] **T-900** Go coverage threshold: **75 %, blocking**, matching the estate's stated PHP gate.
       Enforced by `test:coverage:gate` in `.gitlab-ci.yml`; the suite currently sits at 77.1 %.
-- [ ] **T-901** Decide `chore → patch` versus a default `ignore.authors: [renovate-bot]` for
-      `package`/`extension` (SPEC §14.1).
+- [x] **T-901** Decided by the estate layer: `chore → patch` everywhere, no author ignore — a
+      dependency bump is a release, and the bots type pipeline-only bumps `ci(deps)` instead
+      (SPEC §5.1, 2026-09-14).
 - [ ] **T-902** Decide whether `sign: required` is mandated for any repo class (SPEC §14.2).
 - [ ] **T-903** Decide the release behaviour of `build` and `revert` commit types (plan §8.4).
-- [ ] **T-904** Decide the name (SPEC §14.5).
+- [x] **T-904** The name is `yasrt`; public as `github.com/ohartwig/yasrt` since 2026-09-13.

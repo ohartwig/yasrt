@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.11.0](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.10.1...v1.11.0) (2026-09-14)
+
+### :sparkles: Features
+
+* **next:** name the release that carries only pipeline chores in an image repository ([b27d6b6](https://git.ole-hartwig.eu/yasrt/cli/commit/b27d6b62878b6ab7c57e9a432a7cc0d0fe1712a4))
+
 ## [1.10.1](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.10.0...v1.10.1) (2026-09-14)
 
 ### :bug: Fixes

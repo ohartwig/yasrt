@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.10.1](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.10.0...v1.10.1) (2026-09-14)
+
+### :bug: Fixes
+
+* **forge:** wait for a just-pushed ref before giving up on the trigger ([39c591a](https://git.ole-hartwig.eu/yasrt/cli/commit/39c591a92f8e9420ab71cf09b6d28e37ef68b93e))
+
+### :memo: Documentation
+
+* **tasks:** one blank line ([3fabf62](https://git.ole-hartwig.eu/yasrt/cli/commit/3fabf620e2a01119c0641abbdf47575f5b2b59a5))
+* **tasks:** the old chain is gone ([97772e1](https://git.ole-hartwig.eu/yasrt/cli/commit/97772e13e1994af89e86525b00848b799b679aab))
+* **tasks:** the cut-over is complete; first night in production ([1fc991f](https://git.ole-hartwig.eu/yasrt/cli/commit/1fc991ff69fd046406b6eb1ecae3f38c90c1eb90))
+
+### :repeat: Continuous Integrations
+
+* release-tools/yasrt@2 ([f00caed](https://git.ole-hartwig.eu/yasrt/cli/commit/f00caed7cfec70aa73c3a67334c89a58f1578c14))
+* the release tells merge requests and issues they shipped, as before ([3c58f6d](https://git.ole-hartwig.eu/yasrt/cli/commit/3c58f6d3e7325c474f474f88877d2e6ad6a80650))
+
 ## [1.10.0](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.9.1...v1.10.0) (2026-09-13)
 
 ### :sparkles: Features

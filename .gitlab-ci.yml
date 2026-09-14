@@ -79,7 +79,7 @@ include:
   # mirror repository -- the one stored secret this repository has, and it is
   # about publishing the project, not about releasing it.
   # renovate: datasource=gitlab-tags depName=devops/ci-cd-components/extension-clean-export
-  - component: ${CI_SERVER_HOST}/devops/ci-cd-components/extension-clean-export/github-mirror@1.4.0
+  - component: ${CI_SERVER_HOST}/devops/ci-cd-components/extension-clean-export/github-mirror@1.4.1
     inputs:
       stage: .post
       mirror-target: 'ohartwig/yasrt'
@@ -100,7 +100,7 @@ include:
   # rendered, from release-report.json; the changelog commit exists only in
   # that job's checkout.
   # renovate: datasource=gitlab-tags depName=devops/ci-cd-components/extension-clean-export
-  - component: ${CI_SERVER_HOST}/devops/ci-cd-components/extension-clean-export/github-release@1.4.0
+  - component: ${CI_SERVER_HOST}/devops/ci-cd-components/extension-clean-export/github-release@1.4.1
     inputs:
       stage: .post
       release-target: 'ohartwig/yasrt'

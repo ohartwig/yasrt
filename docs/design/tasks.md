@@ -381,15 +381,34 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
       and `trigger-renovate`; s3mail, `wolfi-packages` and the four tag-publishing flavours
       (oras-app-*, typo3-deploy-shared) use it. Same release: the loop guard recognises the
       release commit by type *and* scope — the scope alone swallowed a `feat(release)`.
-- [~] **T-189** Wave 2, 2026-09-13: 38 of the 44 golden-image consumers on `release-tool: yasrt`
-      (build and scan rules admit the default-branch push; crowdsec's VEX image test resolves
-      `RELEASE_TAG`), every main pipeline green with "nothing to do" on the `ci:` commit. Not
-      migrated: the four exporters (they never used semantic-release — a hand-written
-      `release:from-package`), `mariadb` (two series, `$CI_COMMIT_TAG-11.8`/`-12.3` in inputs
-      that shell-expand to `-11.8` without a tag) and `pa11y-ci` (a test job whose `image:` is
-      the released tag) — both want either the `${CI_COMMIT_TAG:-$RELEASE_TAG}` form where a
-      script expands it or the tag-pipeline mode on the golden-image bundle. Then
-      `release-tools` itself, and the removal of `semantic-release@1` and `yasrt-shadow@1`.
+- [x] **T-189** Waves 2 and 3, 2026-09-13: every active repository that used semantic-release
+      is on yasrt -- 38 golden-image consumers on the default-branch shape, 57 bundle consumers
+      (49 typo3-extensions, oras-app-*, typo3-deploy-shared, symfony/npm), 8 direct includes in
+      the tag-pipeline shape (s3mail, wolfi-packages, franken-php, deploy-opkssh, pinup),
+      `release-tools` releasing itself with its own template. Not migrated: the four exporter
+      images (never used semantic-release), the three composed `selftest/*` fixtures (release
+      disabled by design), `pinup/ci-component` (blocked by its own pre-existing selftest).
+      `semantic-release@1` and `yasrt-shadow@1` are no longer included anywhere.
+- [x] **T-190** `devops/renovate-runner` job-token allowlist for development, devops,
+      ai-ready-platform, moselwal. Two findings on the way: a job-token trigger runs as the
+      upstream pipeline's user, so a Renovate-merged release triggers as `renovate-bot`, an
+      external user GitLab will not let resolve an Internal component even as a Maintainer
+      (renovate-runner!325 skips the lint include on the fast lane); and the include's
+      override then stood without a job (renovate-runner!327). Fast lane green since 00:53.
+- [x] **T-191** Production figures, 2026-09-13 (`tools/cutover-report.py`, 212 projects, plus
+      12 repositories end to end): semantic-release script time median 47 s (p90 90 s, max
+      546 s; of which ~22 s `npm install`, ~8 s fetch and push probe, ~1.5 s analysis, ~12 s
+      publish) against yasrt `version` 1 s and `release` 2 s median (8–30 s on a real release).
+      Merge → artefact done: 4.7 min → 3.2 min median, two pipelines → one. First night in
+      production: 162 releases, two lost to the pipeline race (exit 5 by design, next push
+      carries them), no other failure.
+- [x] **T-193** Parity items found by reading the old chain's `success` step: the
+      ":tada: included in version" note on merge requests and the "resolved in version" note on
+      issues (`contrib/gitlab-release-comments.py`, public; `release:comments` behind the
+      component's `mr-comments`, on in every releasing flavour and direct include; 150+ notes
+      the first night, wording as before); a web-started pipeline may release; CHANGELOG
+      sections as the preset wrote them. Not replicated: `failComment` (an issue "The automated
+      release is failing", twice in five weeks, both still open).
 - [x] **T-192** Found by the tag-pipeline trigger: GitLab's trigger endpoint ignores the
       `JOB-TOKEN` header and wants the token in the body — every follow-up trigger before
       1.9.1 failed with 400 "token is missing", non-fatally and therefore unnoticed. The test

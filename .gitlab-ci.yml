@@ -49,6 +49,78 @@ include:
       # renovate-runner, which hands the image group to pinup.
       trigger-renovate: 'true'
 
+  # The manifest is signed with the estate's key: a detached cosign signature
+  # over dist/SHA256SUMS, key in KMS, role over OIDC, verified before it
+  # leaves the job. The same component and the same key s3mail uses; a second
+  # route to the key would be a second way to use it wrongly. The job exists
+  # on every push to main and gates on the release decision in its script,
+  # like every other job of the handshake -- rules: cannot see .release.env.
+  # renovate: datasource=gitlab-tags depName=devops/ci-cd-components/build-provenance
+  - component: ${CI_SERVER_HOST}/devops/ci-cd-components/build-provenance/sign-artifact@2.0.155
+    inputs:
+      stage: build
+      artifact-file: dist/SHA256SUMS
+      needs-config:
+        - version
+        - build:binaries
+      rules-config:
+        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+      additional-script-begin: '[ "$RELEASE_STATUS" = "release" ] || { echo "skip: ${RELEASE_STATUS:-unknown}"; exit 0; }'
+
+  # The public mirror, from the component rather than a copy of the job:
+  # yasrt, pinup and s3mail each carried one, and the copies drifted. The
+  # history goes to GitHub without the agent guidance, the allowed-signers
+  # list, .gitlab/ and the manifests of the author's own toolchain; main and
+  # the v-tags, force-pushed with --prune. Runs after every stage, so a tag
+  # made in this pipeline is mirrored in the same one; a push made with the
+  # job token starts no pipeline, so nothing runs twice.
+  #
+  # GITHUB_MIRROR_TOKEN is a fine-grained token with contents:write on the
+  # mirror repository -- the one stored secret this repository has, and it is
+  # about publishing the project, not about releasing it.
+  # renovate: datasource=gitlab-tags depName=devops/ci-cd-components/extension-clean-export
+  - component: ${CI_SERVER_HOST}/devops/ci-cd-components/extension-clean-export/github-mirror@1.4.0
+    inputs:
+      stage: .post
+      mirror-target: 'ohartwig/yasrt'
+      mirror-token-var: 'GITHUB_MIRROR_TOKEN'
+      strip-paths: ['CLAUDE.md', '.gitsigners', '.gitsigners.d', '.gitlab', 'renovate.json', '.mise.toml', 'lefthook.yml']
+      keep-tags: 'v*'
+      prune: 'true'
+      rules-config:
+        - if: $GITHUB_MIRROR_TOKEN == null
+          when: never
+        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+
+  # The GitHub release, with the binaries this pipeline built and the
+  # manifest it signed -- the same files the package registry holds. The
+  # workflow that rebuilt the binaries on GitHub is gone: a binary built a
+  # second time elsewhere is a second artefact under the same name, and a
+  # signature cannot be rebuilt at all. The notes are the ones `yasrt release`
+  # rendered, from release-report.json; the changelog commit exists only in
+  # that job's checkout.
+  # renovate: datasource=gitlab-tags depName=devops/ci-cd-components/extension-clean-export
+  - component: ${CI_SERVER_HOST}/devops/ci-cd-components/extension-clean-export/github-release@1.4.0
+    inputs:
+      stage: .post
+      release-target: 'ohartwig/yasrt'
+      release-token-var: 'GITHUB_MIRROR_TOKEN'
+      release-tag: 'v${RELEASE_VERSION}'
+      assets: ['dist/yasrt-*', 'dist/SHA256SUMS', 'dist/SHA256SUMS.sig']
+      notes-from-report: 'release-report.json'
+      needs-config:
+        - mirror:github
+        - version
+        - build:binaries
+        - release
+        - job: sign:artifact:dist/SHA256SUMS
+          optional: true
+      rules-config:
+        - if: $GITHUB_MIRROR_TOKEN == null
+          when: never
+        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
+      additional-script-begin: '[ "$RELEASE_STATUS" = "release" ] || { echo "skip: ${RELEASE_STATUS:-unknown}"; exit 0; }'
+
 .go-base: &go-base
   image: $GO_IMAGE
   cache:
@@ -149,7 +221,15 @@ build:binaries:
 
 upload:package-registry:
   stage: build
-  needs: [version, build:binaries]
+  # The signature where the component made one. Optional: the signing job is
+  # created on main only, and exits 3 -- a warning, no file -- where the key
+  # is not configured. A release without a signature is still a release; a
+  # release that links a signature which is nowhere is not (s3mail v1.0.0).
+  needs:
+    - version
+    - build:binaries
+    - job: sign:artifact:dist/SHA256SUMS
+      optional: true
   # The golden image, not the mirror: the mirror publishes no :latest, and
   # S3mail's release jobs already use this one. 8.21 is the rolling curl stream
   # tag, the same shape as devops/images/golang:1.27.
@@ -165,7 +245,8 @@ upload:package-registry:
     # the runners cannot reach. The API does the same job, and curl is here.
     - cd dist
     - |
-      for f in yasrt-linux-amd64 yasrt-linux-arm64 yasrt-darwin-arm64 yasrt-darwin-amd64 SHA256SUMS; do
+      for f in yasrt-linux-amd64 yasrt-linux-arm64 yasrt-darwin-arm64 yasrt-darwin-amd64 SHA256SUMS SHA256SUMS.sig; do
+        [ -f "$f" ] || { echo "not here, not uploaded: $f"; continue; }
         curl --fail-with-body --silent --show-error \
           --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
           --upload-file "$f" "${PACKAGE_URL}/${RELEASE_VERSION}/${f}"
@@ -192,63 +273,3 @@ release:
     - apk add --no-cache git
     - go build -o /tmp/yasrt ./cmd/yasrt
     - /tmp/yasrt release
-
-# The public mirror. A GitLab push mirror copies the repository as it is;
-# this one leaves out what is working material of this instance rather than
-# part of the project -- the agent guidance and the allowed-signers list --
-# by rewriting the history without those paths and force-pushing the result.
-# git filter-repo is deterministic, so the rewritten commits keep their ids
-# from run to run and the tags on GitHub stay put once published. Runs after
-# `release`, so a tag made in this pipeline is mirrored in the same one; a
-# push made with the job token starts no pipeline, so nothing runs twice.
-#
-# GITHUB_MIRROR_TOKEN is a fine-grained token with contents:write on the
-# mirror repository -- the one stored secret this repository has, and it is
-# about publishing the project, not about releasing it.
-mirror:github:
-  stage: .post
-  # github.com has no IPv6 and the spot fleet no public IPv4; this runner
-  # has both, which is why the image builds run there too.
-  tags: [az1a]
-  needs:
-    - job: release
-      optional: true
-      artifacts: false
-  image:
-    name: registry.ole-hartwig.eu/devops/ci-mirrors/python:3-alpine@sha256:05b2b8b732ecd268fee8727a369f936f022d1321b59befd13c30ede22769dcdc
-    entrypoint: [""]
-  variables:
-    GIT_DEPTH: 0
-    GIT_STRATEGY: clone
-  rules:
-    - if: $GITHUB_MIRROR_TOKEN == null
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
-  script:
-    - apk add --no-cache git
-    - pip install --quiet --root-user-action=ignore git-filter-repo
-    - |
-      set -eu
-      # A fresh clone with every tag: the checkout the runner made has the
-      # branch only, and filter-repo wants a clean repository.
-      git clone --quiet --mirror "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" /tmp/mirror
-      cd /tmp/mirror
-      git filter-repo --quiet --invert-paths \
-        --path CLAUDE.md --path .gitsigners --path .gitsigners.d --path .gitlab/ \
-        --path renovate.json --path .mise.toml --path lefthook.yml
-      # Only the default branch and the release tags go public. A loop rather
-      # than grep | xargs: grep exits 1 when nothing matches, and under set -e
-      # in BusyBox sh that ended the job with nothing to say.
-      git for-each-ref --format='%(refname)' refs/heads refs/tags | while read -r ref; do
-        case "$ref" in
-          "refs/heads/${CI_DEFAULT_BRANCH}"|refs/tags/v*) ;;
-          *) git update-ref -d "$ref" ;;
-        esac
-      done
-      echo "publishing $(git rev-parse --short "${CI_DEFAULT_BRANCH}") and tags: $(git tag | tr '\n' ' ')"
-      # refs/heads/* with --prune: whatever branch GitHub still has that this
-      # repository does not push (only the default branch survives the
-      # filter above) is removed, so nothing unfiltered lingers there.
-      git push --force --prune "https://x-access-token:${GITHUB_MIRROR_TOKEN}@github.com/ohartwig/yasrt.git" \
-        'refs/heads/*:refs/heads/*' 'refs/tags/*:refs/tags/*'
-      echo "mirrored to github.com/ohartwig/yasrt"

@@ -38,7 +38,7 @@ include:
   # and this repository uses -- would otherwise fail its own release. The
   # component's jobs stay (defaults layer, rules, artefacts); only the image
   # and the command are replaced below.
-  - component: ${CI_SERVER_HOST}/devops/ci-cd-components/release-tools/yasrt@1
+  - component: ${CI_SERVER_HOST}/devops/ci-cd-components/release-tools/yasrt@2
     inputs:
       stage-version: version
       stage-release: release

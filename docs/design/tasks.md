@@ -488,6 +488,7 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
 - [x] **T-901** Decided by the estate layer: `chore → patch` everywhere, no author ignore — a
       dependency bump is a release, and the bots type pipeline-only bumps `ci(deps)` instead
       (SPEC §5.1, 2026-09-14).
-- [ ] **T-902** Decide whether `sign: required` is mandated for any repo class (SPEC §14.2).
-- [ ] **T-903** Decide the release behaviour of `build` and `revert` commit types (plan §8.4).
+- [x] **T-902** No mandated `sign: required`; `auto` everywhere (SPEC §14.2, 2026-09-14).
+- [x] **T-903** `build` and `revert` release nothing under the estate's rules; the binary's neutral
+      default keeps semantic-release's `revert → patch` (SPEC §14.5, confirmed 2026-09-14).
 - [x] **T-904** The name is `yasrt`; public as `github.com/ohartwig/yasrt` since 2026-09-13.

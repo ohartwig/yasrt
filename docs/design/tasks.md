@@ -419,6 +419,20 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
 - [ ] **T-191** Production performance comparison after ~100 releases: `tools/cutover-report.py`
       (first figures: `version` ~1 s and `release` 1–14 s against 42–50 s of script time for
       semantic-release).
+- [x] **T-194** The old chain is gone, 2026-09-14: release-tools **2.0.0** deletes the
+      `semantic-release` and `yasrt-shadow` templates (`@1` still resolves to the last 1.x);
+      composed 2.12.x includes neither and defaults `release-tool` to `yasrt`; every bundle and
+      all 28 direct includes are on `yasrt@2`. `pinup/ci-component` migrated last (its selftest
+      cannot run on a merge-request ref: the token is protected -- non-blocking there, gating on
+      main). Found on the way: overrides of a job that no longer exists (`release:semver:`) make
+      a pipeline invalid at creation (pinup/pinup, renovate-runner, npm-app prepared); a
+      job-token trigger runs as the upstream pipeline's user, and when that is `renovate-bot`
+      (external) GitLab refuses every Internal component -- the overnight session's
+      `release:tag-pipeline` (1.27.3) starts the tag pipeline as a person instead; Renovate had
+      pinned `franken-php/ci:3.1.54`, a tag whose image was never built (tag pipeline lost to
+      that), rebuilt by hand. `devops/images/yasrt` gets its `YASRT_VERSION` bumps from pinup
+      now, whose bot needed Reporter on the `yasrt` group.
+
 
 ## P14 — Open-source publication (docs/design/oss-readiness-review.md)
 

@@ -44,6 +44,10 @@ include:
       stage-release: release
       yasrt-image: registry.ole-hartwig.eu/devops/images/golang:1.27
       mr-comments: 'true'
+      # A release here has one first-party consumer, devops/images/yasrt, and
+      # it should not wait for the hourly scan: the fast lane goes through
+      # renovate-runner, which hands the image group to pinup.
+      trigger-renovate: 'true'
 
 .go-base: &go-base
   image: $GO_IMAGE

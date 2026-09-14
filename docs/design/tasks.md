@@ -433,7 +433,6 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
       that), rebuilt by hand. `devops/images/yasrt` gets its `YASRT_VERSION` bumps from pinup
       now, whose bot needed Reporter on the `yasrt` group.
 
-
 ## P14 — Open-source publication (docs/design/oss-readiness-review.md)
 
 - [x] **T-180** B1: `versioning.previous_tag_formats`; this repository tags `v${version}` since

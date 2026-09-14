@@ -277,9 +277,40 @@ func Run(repo *git.Repo, cfg *config.Config, opts Options, log *slog.Logger) (*R
 		return res, nil
 	}
 
+	if w := pipelineOnlyWarning(cfg, res); w != "" {
+		res.Warnings = append(res.Warnings, w)
+	}
+
 	res.Status = StatusRelease
 	res.Tag = cfg.Tag(res.Version)
 	return res, nil
+}
+
+// pipelineOnlyWarning names the release an image repository is about to cut
+// for a change to nothing but its pipeline. For product image the pipeline
+// is part of the deliverable (SPEC §5.1), so this is a release -- but when
+// every counted commit is a chore and every changed path lies under
+// .gitlab-ci.yml or .gitlab/, the image bytes are in all likelihood the ones
+// already published, and every consumer pinned to the tag will roll for
+// nothing. The bots are expected to type such bumps ci(deps), which does not
+// release; until every bot does, the case is at least visible in the log.
+func pipelineOnlyWarning(cfg *config.Config, res *Result) string {
+	if cfg.Product != config.ProductImage || len(res.Decision.Counted) == 0 {
+		return ""
+	}
+	for _, c := range res.Decision.Counted {
+		if c.Type != "chore" || c.Breaking {
+			return ""
+		}
+	}
+	for _, p := range res.Delivery.Delivering {
+		if p != ".gitlab-ci.yml" && !strings.HasPrefix(p, ".gitlab/") {
+			return ""
+		}
+	}
+	return fmt.Sprintf("release %s carries only chore commits that touch nothing but the pipeline (%s); "+
+		"the image it builds is in all likelihood the one already published -- a bot bumping pipeline "+
+		"pins should type them ci(deps), which does not release", res.Version, strings.Join(res.Delivery.Delivering, ", "))
 }
 
 // baseline is what the repository already released, split by kind.

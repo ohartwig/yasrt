@@ -166,6 +166,43 @@ func TestFixBundledWithCIChangeStillReleasesForAPackage(t *testing.T) {
 	}
 }
 
+// An image repository releases for a pipeline-only chore -- SPEC §5.1 makes
+// the pipeline part of the deliverable -- but says so: the image is in all
+// likelihood the one already published, and a bot should have typed the bump
+// ci(deps). A package repository has no such release and no such warning.
+func TestPipelineOnlyChoreWarnsForAnImage(t *testing.T) {
+	rules := "rules:\n  - { type: chore, release: patch }\n  - { type: fix, release: patch }\n"
+	tr := testrepo.New(t)
+	tr.CommitFile("Containerfile", "FROM a", "feat: first")
+	tr.Tag("1.0.0")
+	tr.CommitFile(".gitlab-ci.yml", "include: [x]", "chore(deps): update container-scanning digest")
+
+	res := run(t, tr, cfg(t, "product: image\n"+rules), analyze.Options{})
+	if res.Status != analyze.StatusRelease || res.Tag != "1.0.1" {
+		t.Fatalf("status = %s tag = %q: the pipeline is part of an image", res.Status, res.Tag)
+	}
+	if len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], "ci(deps)") {
+		t.Errorf("warnings = %q, want the pipeline-only warning", res.Warnings)
+	}
+
+	// A fix beside the chore is a real release: no warning.
+	tr.CommitFile("Containerfile", "FROM b", "fix: rebuild on the new base")
+	res = run(t, tr, cfg(t, "product: image\n"+rules), analyze.Options{})
+	if len(res.Warnings) != 0 {
+		t.Errorf("warnings = %q, want none once the image itself changed", res.Warnings)
+	}
+
+	// The same commits in a package repository do not release at all.
+	tr2 := testrepo.New(t)
+	tr2.CommitFile("src/a.go", "1", "feat: first")
+	tr2.Tag("v1.0.0")
+	tr2.CommitFile(".gitlab-ci.yml", "include: [x]", "chore(deps): update container-scanning digest")
+	res = run(t, tr2, cfg(t, "product: package\n"+rules), analyze.Options{})
+	if res.Status != analyze.StatusNotDeliverable || len(res.Warnings) != 0 {
+		t.Errorf("package: status = %s warnings = %q", res.Status, res.Warnings)
+	}
+}
+
 // The deliverability window: a docs-only push after an unreleased feat must not
 // bury the feat. The old component compared the push range and did exactly that.
 func TestUnreleasedFeatSurvivesADocsOnlyPush(t *testing.T) {

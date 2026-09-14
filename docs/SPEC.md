@@ -327,6 +327,19 @@ Glob semantics: `doublestar` (`**`), repo-relative, evaluated against `git diff 
 Tooling files of one organisation (`lefthook.yml`, `.pre-commit-config.yaml`, editor settings) are
 not defaults; they go into `deliverability.extra_non_release_paths` of that organisation's shared
 defaults file, which the CI component carries.
+
+**Pipeline-only changes in an image repository.** `.gitlab-ci.yml` being part of an image's
+deliverable is deliberate: how the image is built, named, signed and scanned lives there and nowhere
+else, and a repository once shipped nothing for four days because a pipeline-only fix "changed no
+product". The flip side is a dependency bot bumping a pin that touches only the pipeline — a
+scanner digest, a component version — as `chore(deps)`: with `chore → patch` that is a release,
+the reproducible build produces the bytes already published under a new tag, and every consumer
+pinned to the tag rolls for nothing (`devops/images/c2patool` 2.1.10 → 2.1.11, 2026-09-14). The
+derivation stays; the expectation is on the bots: **a bump that touches nothing but
+`.gitlab-ci.yml` or `.gitlab/**` is typed `ci(deps)`**, and `ci` releases nothing under the
+estate's rules. `yasrt next` warns when a `product: image` release would consist of nothing but
+`chore` commits whose changed paths all lie under those two — a warning, not a refusal, so the
+case stays visible in the log for as long as some bot still writes `chore` there.
 Also note the range: the current component compares `CI_COMMIT_BEFORE_SHA..HEAD` (the push range),
 which is why a `fix:` bundled with a CI change never ships today (improvement register I-081).
 Comparing `<lastTag>..HEAD` is the fix, and it is a behaviour change to be measured before rollout.

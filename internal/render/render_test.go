@@ -190,3 +190,33 @@ func TestChangelogHeading(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+// A release withdrawn after its tag was cut is cut again under the same
+// version by the next push. Its block is already at the top of the file:
+// replaced, not repeated - with or without a title, and only when it is the
+// first block, never one further down.
+func TestChangelogReplacesTheBlockOfARecutVersion(t *testing.T) {
+	in := input(commit("aaa1111", "feat: something new"), commit("bbb2222", "fix: found on the retry"))
+	stale := "## [3.4.0](https://git.ole-hartwig.eu/yasrt/cli/-/compare/3.4.0...3.3.2) (2026-09-13)\n\n### :sparkles: Features\n\n* something new (aaa1111)\n\n"
+	older := "## [3.3.2] (2026-08-01)\n\n* old thing\n"
+	for name, existing := range map[string]string{
+		"without title": stale + older,
+		"with title":    "# Changelog\n\n" + stale + older,
+	} {
+		got := render.PrependChangelog(existing, in, render.Notes(in))
+		if strings.Count(got, "## [3.4.0]") != 1 {
+			t.Errorf("%s: the block must appear once:\n%s", name, got)
+		}
+		if !strings.Contains(got, "found on the retry") || strings.Contains(got, "2026-09-13") {
+			t.Errorf("%s: the new block must replace the stale one:\n%s", name, got)
+		}
+		if strings.Count(got, "## [3.3.2]") != 1 || !strings.Contains(got, "* old thing") {
+			t.Errorf("%s: the older block must survive:\n%s", name, got)
+		}
+	}
+	// The version further down is history, not a retry.
+	got := render.PrependChangelog("## [3.5.0] (2026-09-14)\n\n* later\n\n"+stale+older, in, render.Notes(in))
+	if strings.Count(got, "## [3.4.0]") != 2 {
+		t.Errorf("a block below the top is kept:\n%s", got)
+	}
+}

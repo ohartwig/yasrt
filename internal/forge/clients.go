@@ -323,10 +323,40 @@ func (c *gitlabClient) TriggerPipeline(ctx context.Context, project, ref string,
 		WebURL string `json:"web_url,omitzero"`
 	}
 	p := "/projects/" + url.PathEscape(project) + "/trigger/pipeline"
-	if err := c.rest.do(ctx, http.MethodPost, p, req, &out); err != nil {
-		return "", err
+	// A tag yasrt pushed seconds ago is not always visible to this endpoint
+	// yet: GitLab answers 400 "Reference not found" and shows the tag a
+	// moment later (pinup/pinup v0.16.1 and v0.17.0, six seconds after the
+	// push, 2026-09-14). That one answer is waited out; every other error
+	// is returned at once, as before.
+	wait := TriggerRefBackoff
+	for attempt := 1; ; attempt++ {
+		err := c.rest.do(ctx, http.MethodPost, p, req, &out)
+		if err == nil {
+			return out.WebURL, nil
+		}
+		if attempt >= triggerRefTries || !isRefNotFound(err) {
+			return "", err
+		}
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-time.After(wait * time.Duration(attempt)):
+		}
 	}
-	return out.WebURL, nil
+}
+
+// triggerRefTries bounds the wait for a just-pushed ref to become visible to
+// the trigger endpoint: 5 + 10 + 15 + 20 s at the default backoff.
+const triggerRefTries = 5
+
+// TriggerRefBackoff is the first wait before retrying a trigger whose ref the
+// server does not see yet; each further attempt waits one step longer. A
+// variable so the tests need not sit through it.
+var TriggerRefBackoff = 5 * time.Second
+
+func isRefNotFound(err error) bool {
+	apiErr, ok := errors.AsType[*APIError](err)
+	return ok && apiErr.Status == http.StatusBadRequest && strings.Contains(apiErr.Body, "Reference not found")
 }
 
 // ---------- GitHub and Forgejo ----------

@@ -12,7 +12,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/ohartwig/yasrt/internal/forge"
 )
@@ -263,6 +265,45 @@ func TestTriggerSupport(t *testing.T) {
 		if c.SupportsTriggers() != want {
 			t.Errorf("%s triggers = %v, want %v", kind, c.SupportsTriggers(), want)
 		}
+	}
+}
+
+// A tag pushed seconds earlier is not always visible to the trigger endpoint
+// yet; that one answer is waited out, anything else is returned at once.
+func TestTriggerWaitsForAFreshRef(t *testing.T) {
+	forge.TriggerRefBackoff = time.Millisecond
+	t.Cleanup(func() { forge.TriggerRefBackoff = 5 * time.Second })
+	var calls atomic.Int32
+	c := clientFor(t, forge.GitLab, func(w http.ResponseWriter, r *http.Request) {
+		if calls.Add(1) < 3 {
+			w.WriteHeader(http.StatusBadRequest)
+			io.WriteString(w, `{"message":{"base":["Reference not found"]}}`)
+			return
+		}
+		io.WriteString(w, `{"id":7,"web_url":"https://git/p/-/pipelines/7"}`)
+	})
+	tr := c.(interface {
+		TriggerPipeline(context.Context, string, string, map[string]string) (string, error)
+	})
+	url, err := tr.TriggerPipeline(t.Context(), "acme/widget", "1.2.3", nil)
+	if err != nil || url == "" {
+		t.Fatalf("trigger after two misses: %q, %v", url, err)
+	}
+	if calls.Load() != 3 {
+		t.Errorf("calls = %d, want 3", calls.Load())
+	}
+	// Any other 400 is not waited out.
+	calls.Store(0)
+	c = clientFor(t, forge.GitLab, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, `{"message":{"base":["token is missing"]}}`)
+	})
+	tr = c.(interface {
+		TriggerPipeline(context.Context, string, string, map[string]string) (string, error)
+	})
+	if _, err := tr.TriggerPipeline(t.Context(), "acme/widget", "1.2.3", nil); err == nil || calls.Load() != 1 {
+		t.Errorf("other 400s must fail at once: err=%v calls=%d", err, calls.Load())
 	}
 }
 

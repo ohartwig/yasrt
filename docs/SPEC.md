@@ -632,16 +632,17 @@ today. Prereleases move from non-goal to a later phase. `tag_format` is derived 
 The GitLab client library is dropped in favour of `net/http`. Signing is keyed cosign against AWS
 KMS, not keyless.
 
-**Still open** (tracked as T-900…T-904 in [`tasks.md`](tasks.md)):
+**Decided** (tracked as T-900…T-904 in [`design/tasks.md`](design/tasks.md)); kept here so the reasoning stays with the questions:
 
-1. **`chore → patch`:** intentional? With Renovate commits (`chore(deps)`) every dependency bump becomes a release. Proposal: keep the rule, but default `ignore.authors: [renovate-bot]` for `package`/`extension`.
-2. **Mandatory signing:** should `sign: required` be enforced for certain repos (public sector) before the OIDC path exists?
+1. ~~**`chore → patch`.**~~ *(resolved 2026-09-14)* Intentional, estate-wide, no author ignore: a dependency bump is a release. The one case where that ships nothing new — a bot bumping a pin that touches only the pipeline of an image repository — is handled by the bots typing it `ci(deps)` (§5.1), not by a rule.
+2. ~~**Mandatory signing.**~~ *(resolved 2026-09-14)* No: `sign: auto` everywhere. The artefact that matters is signed by cosign against KMS inside the pipeline regardless of the git tag, and the commit-signing policy exempts the release commit. An organisation that wants signed tags puts one key into its defaults layer; a gate that fails releases for a missing key buys nothing that policy does not already state.
 3. ~~**Release commit at all?**~~ *(resolved: enabled by default)* Without F6, the branch push, GPG and the provenance question disappear entirely; the CHANGELOG then lives only in the GitLab release. Recommendation: keep it switchable per repo (`release_commit.enabled: false`), decide the default.
-4. **Emoji for Chores:** `:wrench:` as replacement for the duplicated `:repeat:` — matter of taste.
-5. ~~**`build` / `revert`.**~~ *(resolved 2026-09-13)* The binary's default rules are
+4. ~~**Emoji for Chores.**~~ *(resolved 2026-09-14)* The binary keeps `:wrench:`; the estate's defaults layer keeps the preset's `:repeat:` so its CHANGELOGs read on unchanged.
+5. ~~**`build` / `revert`.**~~ *(resolved 2026-09-13, confirmed 2026-09-14)* The binary's default rules are
    semantic-release's: `revert → patch`, `build` and `chore` release nothing. The estate's
-   `chore → patch` and "revert ships nothing" live in the CI component's defaults file, where
-   every organisation-specific value now lives (OSS review, B2).
+   `chore → patch` and "`build` and `revert` ship nothing" live in the CI component's defaults
+   file, where every organisation-specific value now lives (OSS review, B2). A revert that must
+   reach consumers travels with the `fix:` that follows it.
 6. **Go coverage threshold.** The estate's stated gate is 75 % line coverage from Cobertura for PHP;
    Go reports through GitLab's `coverage:` regex instead. Pick a number and say whether it blocks.
-7. **Name.** YASRT is honest but unpronounceable.
+7. ~~**Name.**~~ *(resolved 2026-09-13)* `yasrt`, public as `github.com/ohartwig/yasrt`.

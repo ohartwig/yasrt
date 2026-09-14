@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.12.0](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.11.0...v1.12.0) (2026-09-14)
+
+### :sparkles: Features
+
+* **release:** the assets on GitHub are the signed ones from here ([7474aaa](https://git.ole-hartwig.eu/yasrt/cli/commit/7474aaaf1ef5ec1723dbf0e43b8d67949b5cfb4d))
+
+### :memo: Documentation
+
+* the last two open questions are decided ([1596cb8](https://git.ole-hartwig.eu/yasrt/cli/commit/1596cb8f20b25a50415279eaf72f6acd70391fb3))
+* **tasks:** close the phases the cut-over superseded ([f5f4e50](https://git.ole-hartwig.eu/yasrt/cli/commit/f5f4e508da49629707fa9eb61722704146872c44))
+
+### :repeat: Continuous Integrations
+
+* a release starts the fast lane for the image ([1deeff9](https://git.ole-hartwig.eu/yasrt/cli/commit/1deeff9593eb5a861ec4a132b8cc90f8eb0841b0))
+
 ## [1.11.0](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.10.1...v1.11.0) (2026-09-14)
 
 ### :sparkles: Features

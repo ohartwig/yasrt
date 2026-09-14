@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.12.1](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.12.0...v1.12.1) (2026-09-14)
+
+### :bug: Fixes
+
+* **ci:** extension-clean-export 1.4.1 - the mirror exports its token ([52f9710](https://git.ole-hartwig.eu/yasrt/cli/commit/52f9710663a5df2a4c452bc78fc17bc976a2fb27))
+
 ## [1.12.0](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.11.0...v1.12.0) (2026-09-14)
 
 ### :sparkles: Features

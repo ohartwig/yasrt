@@ -196,9 +196,31 @@ func PrependChangelog(existing string, in Input, notes string) string {
 
 	head, rest := splitTitle(existing)
 	if head == "" {
-		return title + sep(title) + block + "\n" + strings.TrimLeft(existing, "\n")
+		rest = existing
+	}
+	// A release withdrawn after its tag was cut - the tag pipeline or the
+	// publish failed, and release-tools took the tag back - is cut again
+	// by the next push, under the same version. Its block is already at
+	// the top of the file; it is replaced, not repeated.
+	rest = dropBlockOf(rest, in.Version)
+	if head == "" {
+		return title + sep(title) + block + "\n" + strings.TrimLeft(rest, "\n")
 	}
 	return head + "\n" + block + "\n" + strings.TrimLeft(rest, "\n")
+}
+
+// dropBlockOf removes the release block of v when it is the first one in
+// doc: its heading and everything up to the next release heading.
+func dropBlockOf(doc string, v semver.Version) string {
+	body := strings.TrimLeft(doc, "\n")
+	prefix := "## [" + v.String() + "]"
+	if !strings.HasPrefix(body, prefix) {
+		return doc
+	}
+	if i := strings.Index(body[len(prefix):], "\n## "); i >= 0 {
+		return body[len(prefix)+i+1:]
+	}
+	return ""
 }
 
 func sep(title string) string {

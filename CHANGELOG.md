@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.12.2](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.12.1...v1.12.2) (2026-09-15)
+
+### :bug: Fixes
+
+* **render:** a version cut again replaces its stale changelog block ([0057e00](https://git.ole-hartwig.eu/yasrt/cli/commit/0057e0017805b2f8cba50cea652ca0ca6ab75d35))
+
 ## [1.12.1](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.12.0...v1.12.1) (2026-09-14)
 
 ### :bug: Fixes

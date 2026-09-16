@@ -283,9 +283,9 @@ func TestTriggerWaitsForAFreshRef(t *testing.T) {
 		io.WriteString(w, `{"id":7,"web_url":"https://git/p/-/pipelines/7"}`)
 	})
 	tr := c.(interface {
-		TriggerPipeline(context.Context, string, string, map[string]string) (string, error)
+		TriggerPipeline(context.Context, string, string, map[string]string, string) (string, error)
 	})
-	url, err := tr.TriggerPipeline(t.Context(), "acme/widget", "1.2.3", nil)
+	url, err := tr.TriggerPipeline(t.Context(), "acme/widget", "1.2.3", nil, "")
 	if err != nil || url == "" {
 		t.Fatalf("trigger after two misses: %q, %v", url, err)
 	}
@@ -300,9 +300,9 @@ func TestTriggerWaitsForAFreshRef(t *testing.T) {
 		io.WriteString(w, `{"message":{"base":["token is missing"]}}`)
 	})
 	tr = c.(interface {
-		TriggerPipeline(context.Context, string, string, map[string]string) (string, error)
+		TriggerPipeline(context.Context, string, string, map[string]string, string) (string, error)
 	})
-	if _, err := tr.TriggerPipeline(t.Context(), "acme/widget", "1.2.3", nil); err == nil || calls.Load() != 1 {
+	if _, err := tr.TriggerPipeline(t.Context(), "acme/widget", "1.2.3", nil, ""); err == nil || calls.Load() != 1 {
 		t.Errorf("other 400s must fail at once: err=%v calls=%d", err, calls.Load())
 	}
 }
@@ -495,12 +495,12 @@ func TestTriggerPipelinePostsToTheTargetProject(t *testing.T) {
 		io.WriteString(w, `{"id":5,"web_url":"https://h/p/-/pipelines/5"}`)
 	})
 	tr, ok := c.(interface {
-		TriggerPipeline(context.Context, string, string, map[string]string) (string, error)
+		TriggerPipeline(context.Context, string, string, map[string]string, string) (string, error)
 	})
 	if !ok {
 		t.Fatal("gitlab client should trigger pipelines")
 	}
-	u, err := tr.TriggerPipeline(context.Background(), "devops/renovate", "main", map[string]string{"X": "1"})
+	u, err := tr.TriggerPipeline(context.Background(), "devops/renovate", "main", map[string]string{"X": "1"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -509,6 +509,17 @@ func TestTriggerPipelinePostsToTheTargetProject(t *testing.T) {
 	}
 	if body["ref"] != "main" {
 		t.Errorf("body = %+v", body)
+	}
+	if body["token"] == "" || body["token"] == "glptt-x" {
+		t.Errorf("without a trigger token the job token goes in the body: %v", body["token"])
+	}
+	// A trigger token of the target project replaces the job token: the
+	// pipeline then runs as the token's owner, whoever started this job.
+	if _, err := tr.TriggerPipeline(context.Background(), "devops/renovate", "main", nil, "glptt-x"); err != nil {
+		t.Fatal(err)
+	}
+	if body["token"] != "glptt-x" {
+		t.Errorf("the trigger token must go in the body: %v", body["token"])
 	}
 }
 

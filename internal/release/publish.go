@@ -163,7 +163,13 @@ func runTriggers(ctx context.Context, o Options, cfg *config.Config, res *analyz
 				vars[k] = expand(v)
 			}
 			r.Project, r.Ref = expand(t.Project), expand(t.Ref)
-			url, err := triggerer.TriggerPipeline(ctx, r.Project, r.Ref, vars)
+			token := ""
+			if t.TokenVar != "" {
+				if token = os.Getenv(t.TokenVar); token == "" {
+					log.Info("trigger token variable unset; the job token is sent instead", "project", t.Project, "var", t.TokenVar)
+				}
+			}
+			url, err := triggerer.TriggerPipeline(ctx, r.Project, r.Ref, vars, token)
 			if err != nil {
 				// Non-fatal by design: the release is already published.
 				r.Error = err.Error()
@@ -180,8 +186,10 @@ func runTriggers(ctx context.Context, o Options, cfg *config.Config, res *analyz
 
 // pipelineTriggerer is implemented only where the platform has an endpoint for
 // starting a pipeline in another project.
+// token, when set, is a pipeline trigger token of the target project and
+// replaces the job token in the request.
 type pipelineTriggerer interface {
-	TriggerPipeline(ctx context.Context, project, ref string, vars map[string]string) (string, error)
+	TriggerPipeline(ctx context.Context, project, ref string, vars map[string]string, token string) (string, error)
 }
 
 // expandEnv resolves ${CI_PROJECT_PATH} style references in trigger variables.

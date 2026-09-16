@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.13.0](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.12.2...v1.13.0) (2026-09-16)
+
+### :sparkles: Features
+
+* **triggers:** a trigger entry may name a variable with a pipeline trigger token ([681cf4e](https://git.ole-hartwig.eu/yasrt/cli/commit/681cf4e9322c928562eb8b3679be2524230836a9))
+
 ## [1.12.2](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.12.1...v1.12.2) (2026-09-15)
 
 ### :bug: Fixes

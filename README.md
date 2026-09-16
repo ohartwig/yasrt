@@ -143,6 +143,15 @@ and CI variables in `project`, `ref` and `variables`, so
 `{ project: "${CI_PROJECT_PATH}", ref: "${tag}" }` runs the tag pipeline the
 job-token push did not.
 
+A trigger is sent with the job token unless the entry names a variable
+holding a pipeline trigger token of the target project, `token_var:
+PINUP_TRIGGER_TOKEN`. The difference is who the started pipeline runs as:
+under the job token it is the user behind the release job, who must be
+allowed to run pipelines in the target project - a review bot or a colleague
+merging a request usually is not, and the trigger answers 404; under a
+trigger token it is the token's owner, whoever merged. An unset variable
+falls back to the job token and says so in the log.
+
 A CI/CD component with this shape (`version`, `release`, a shared defaults
 layer, `product` and `tag-format` as inputs) lives in
 `devops/ci-cd-components/release-tools` on the same instance:

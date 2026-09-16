@@ -289,6 +289,15 @@ type Trigger struct {
 	Project   string            `yaml:"project"`
 	Ref       string            `yaml:"ref"`
 	Variables map[string]string `yaml:"variables"`
+	// TokenVar names an environment variable holding a pipeline trigger
+	// token of the target project. With it the pipeline runs as the
+	// token's owner and needs no membership; without it (or with the
+	// variable unset) the job token is sent, and the pipeline runs as the
+	// user behind this job - who must be allowed to run pipelines in the
+	// target project, which a review bot or a colleague merging a request
+	// usually is not (measured 2026-09-16: findready-site's follow-up to
+	// pinup/runner answered 404 under koh-review-agent).
+	TokenVar string `yaml:"token_var"`
 }
 
 // prereleaseIdentifierRE is SemVer's alphanumeric identifier, minus the dot:

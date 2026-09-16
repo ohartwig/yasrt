@@ -27,6 +27,11 @@ package manager in the release path.
   and hand it the release context: a plugin system's reach without its supply
   chain.
 
+This README is the reference. The same material as web pages, with the CI
+recipes, configuration and forges on pages of their own:
+<https://ole-hartwig.eu/en/open-source/yasrt> (German:
+<https://ole-hartwig.eu/open-source/yasrt>).
+
 ## Why
 
 `semantic-release` gets the decisions right and the mechanics wrong for CI:

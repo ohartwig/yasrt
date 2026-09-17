@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.13.1](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.0...v1.13.1) (2026-09-17)
+
+### :memo: Documentation
+
+* **readme:** link the documentation pages on ole-hartwig.eu ([8e5a00b](https://git.ole-hartwig.eu/yasrt/cli/commit/8e5a00b558fb90428a09312d31d911977561f62c))
+
+### :repeat: Chores
+
+* **repo-templates:** sync ([640da20](https://git.ole-hartwig.eu/yasrt/cli/commit/640da20ab8c18bd4db25cf5842bbced5ca903240))
+
 ## [1.13.0](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.12.2...v1.13.0) (2026-09-16)
 
 ### :sparkles: Features

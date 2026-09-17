@@ -6,4 +6,4 @@ Acknowledgments: https://ole-hartwig.eu/security/hall-of-fame
 Preferred-Languages: de, en
 Canonical: https://ole-hartwig.eu/.well-known/security.txt
 Policy: https://ole-hartwig.eu/security
-CSAF: https://ole-hartwig.eu/.well-known/csaf-provider-metadata.json
+CSAF: https://ole-hartwig.eu/.well-known/csaf/provider-metadata.json

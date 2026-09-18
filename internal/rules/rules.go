@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0
 
 // Package rules turns a range of parsed commits into a single release size.
 //

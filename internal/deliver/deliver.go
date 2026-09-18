@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0
 
 // Package deliver answers one question: did this commit range change anything
 // that ends up in the artefact?

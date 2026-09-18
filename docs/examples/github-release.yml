@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # .github/workflows/release.yml -- releasing with yasrt on GitHub Actions.
 # The same file runs on Forgejo Actions with FORGEJO_TOKEN in place of

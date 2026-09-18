@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0
 
 // Package gitlabprobe reads the two protection rule sets `yasrt check`
 // compares -- who may merge into the default branch, who may create the

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0
 
 // Package semver implements the small subset of Semantic Versioning that yasrt
 // needs: parse, compare and bump MAJOR.MINOR.PATCH. Prerelease identifiers are

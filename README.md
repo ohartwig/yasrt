@@ -1,6 +1,6 @@
 <!--
 SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 -->
 
 # yasrt
@@ -317,5 +317,5 @@ issues and pull requests here are both read.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Every file carries an SPDX header; the
+Apache-2.0 — see [LICENSE](LICENSE); releases up to 1.13.1 were MIT. Every file carries an SPDX header; the
 repository is [REUSE](https://reuse.software/) compliant.

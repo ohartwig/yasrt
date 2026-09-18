@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0
 
 // Package output renders an analysis for other jobs to consume.
 //

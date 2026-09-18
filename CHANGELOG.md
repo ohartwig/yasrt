@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.13.2](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.1...v1.13.2) (2026-09-18)
+
+### :repeat: Continuous Integrations
+
+* **deps:** update ci components ([00ddfb1](https://git.ole-hartwig.eu/yasrt/cli/commit/00ddfb191fd0abcc4fc6c5f97ed3d41dfa32f9fb))
+* **deps:** pin registry.ole-hartwig.eu/devops/images/curl docker tag to e3e22cf ([598bc43](https://git.ole-hartwig.eu/yasrt/cli/commit/598bc4336a8dead881e9cacd4040316c7a7befd0))
+
+### :repeat: Chores
+
+* **license:** relicense from MIT to Apache-2.0 ([31c40fa](https://git.ole-hartwig.eu/yasrt/cli/commit/31c40fac86e29b55225be9375793f292bfa9cf89))
+
 ## [1.13.1](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.0...v1.13.1) (2026-09-17)
 
 ### :memo: Documentation

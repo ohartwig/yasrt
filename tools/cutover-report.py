@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 """How the repositories that moved to yasrt are doing, and how fast.
 
 For every project whose default-branch pipelines carry a `version` job, list

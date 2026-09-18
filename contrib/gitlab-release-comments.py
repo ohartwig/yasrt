@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 """Tell every merge request and closed issue of a release that it shipped.
 
 What semantic-release/gitlab's `success` step did and yasrt deliberately does

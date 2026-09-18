@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 #
 # A complete GitLab CI pipeline releasing with yasrt, without the CI/CD
 # component: decide, build, release -- the tag only after the build passed.

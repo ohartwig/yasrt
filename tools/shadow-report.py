@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 Kai Ole Hartwig
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 """Collect every shadow:compare verdict on a GitLab instance into one table.
 
 Operator tooling for a migration from semantic-release: while the

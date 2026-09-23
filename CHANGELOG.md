@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.13.3](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.2...v1.13.3) (2026-09-23)
+
+### :bug: Fixes
+
+* **deps:** update module github.com/bmatcuk/doublestar/v4 to v4.10.2 ([b12b6e1](https://git.ole-hartwig.eu/yasrt/cli/commit/b12b6e1b201d02fbca4935b12c1023936bfbc15d))
+
+### :repeat: Continuous Integrations
+
+* components by rolling major, as every consumer should ([d7d142d](https://git.ole-hartwig.eu/yasrt/cli/commit/d7d142d11d97b1c2b5a514a8b793480043467e99))
+
 ## [1.13.2](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.1...v1.13.2) (2026-09-18)
 
 ### :repeat: Continuous Integrations

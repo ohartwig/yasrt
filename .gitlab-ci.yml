@@ -16,7 +16,7 @@ variables:
   GOPATH: ${CI_PROJECT_DIR}/.go
 
 include:
-  - component: ${CI_SERVER_HOST}/devops/ci-cd-components/composed-default-pipelines/go@1
+  - component: ${CI_SERVER_HOST}/devops/ci-cd-components/composed-default-pipelines/go@2
     inputs:
       working-directory: .
       go-image: registry.ole-hartwig.eu/devops/images/golang:1.27

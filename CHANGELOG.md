@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.13.4](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.3...v1.13.4) (2026-09-26)
+
+### :repeat: Continuous Integrations
+
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to a913997 ([66f951a](https://git.ole-hartwig.eu/yasrt/cli/commit/66f951a4a93fabc0598d5f616fb9000d7b492ad5))
+* composed go@2 ([09de320](https://git.ole-hartwig.eu/yasrt/cli/commit/09de3204f39e296b8ecccfbb6ded8236cbf076e5))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 77fa0f7 ([aa13120](https://git.ole-hartwig.eu/yasrt/cli/commit/aa13120094bc3f748e228a2eabf8f99dc9d5846f))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 3c0a8fd ([adc35ef](https://git.ole-hartwig.eu/yasrt/cli/commit/adc35ef287a60ed0de6e41a434faf4e0a941716f))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 9b3f531 ([cdab17c](https://git.ole-hartwig.eu/yasrt/cli/commit/cdab17c00e4e5e97f4597e0226c0080471cc260f))
+
+### :repeat: Chores
+
+* **repo-templates:** sync ([5e1b8c0](https://git.ole-hartwig.eu/yasrt/cli/commit/5e1b8c04d79e610bfbcdc240d38ccb268b3fb381))
+* **deps:** update dependency mstruebing/editorconfig-checker to v3.11.3 ([898c11d](https://git.ole-hartwig.eu/yasrt/cli/commit/898c11d70bb69c5480e72d73b9091de67c744139))
+
 ## [1.13.3](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.2...v1.13.3) (2026-09-23)
 
 ### :bug: Fixes

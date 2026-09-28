@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.13.5](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.4...v1.13.5) (2026-09-28)
+
+### :repeat: Chores
+
+* **repo-templates:** sync ([d027b7c](https://git.ole-hartwig.eu/yasrt/cli/commit/d027b7c78095dc6f74e991c2f5707648b848531c))
+* **repo-templates:** sync ([24f7505](https://git.ole-hartwig.eu/yasrt/cli/commit/24f75056a647e7247400e4e0813853311bf52bc4))
+* **repo-templates:** sync ([3cf7369](https://git.ole-hartwig.eu/yasrt/cli/commit/3cf73696f9c62d98e47445f7571224d275740231))
+* **repo-templates:** sync ([ea727cb](https://git.ole-hartwig.eu/yasrt/cli/commit/ea727cbbf30a55f7b941abd091379b5afd4a3d1b))
+* **deps:** update dependency mstruebing/editorconfig-checker to v3.11.3 ([b4af3ba](https://git.ole-hartwig.eu/yasrt/cli/commit/b4af3bae0ba1c7956f673077b41015d2e511b43b))
+* **repo-templates:** sync ([a68ee43](https://git.ole-hartwig.eu/yasrt/cli/commit/a68ee438191223870b54e82d10eb98b9ff493335))
+* **deps:** update dependency mstruebing/editorconfig-checker to v3.11.3 ([7ebfba9](https://git.ole-hartwig.eu/yasrt/cli/commit/7ebfba9f1e7af5ae561ba22a805dbc1e4eb305b5))
+* **repo-templates:** sync ([76fce78](https://git.ole-hartwig.eu/yasrt/cli/commit/76fce788a7a25be761c5686cfd309fc21857b5b9))
+* **deps:** update dependency davidanson/markdownlint-cli2 to v0.23.3 ([bd1d17b](https://git.ole-hartwig.eu/yasrt/cli/commit/bd1d17b5dfc268a26bb92f9612733948c5afc2ca))
+
 ## [1.13.4](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.3...v1.13.4) (2026-09-26)
 
 ### :repeat: Continuous Integrations

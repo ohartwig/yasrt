@@ -17,8 +17,9 @@ mirror of this repository. Instead, send a report to:
 
 - **Email**: <security@ole-hartwig.eu>
 - **PGP**: download the security key from
-  <https://ole-hartwig.eu/.well-known/openpgpkey> (RFC 9580) and encrypt
-  attachments
+  <https://ole-hartwig.eu/.well-known/csaf/openpgp-key.asc> (OpenPGP,
+  RFC 9580) and encrypt attachments; it is the same key that signs the
+  CSAF advisories
 - **Signal**: on request
 
 Please include the repository or package name and the affected version (tag,

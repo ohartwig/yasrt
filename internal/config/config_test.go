@@ -300,3 +300,28 @@ func TestPreviousTagFormats(t *testing.T) {
 		t.Errorf("new tags use the current format, got %q", got)
 	}
 }
+
+func TestVersionFromReleaseSubject(t *testing.T) {
+	for _, c := range []struct {
+		name, yaml, subject, want string
+		ok                        bool
+	}{
+		{"default message", "product: image\n", "chore(release): 0.53.0", "0.53.0", true},
+		{"default message, prerelease", "product: image\n", "chore(release): 2.0.0-rc.1", "2.0.0-rc.1", true},
+		{"an ordinary commit", "product: image\n", "fix(release): 0.53.0 was wrong", "", false},
+		{"text after the version", "product: image\n", "chore(release): 0.53.0 and more", "", false},
+		{"a tag in the message", "product: image\ntag_format: \"v${version}\"\nrelease_commit:\n  message: \"release ${tag} [skip ci]\"\n", "release v1.4.2 [skip ci]", "1.4.2", true},
+		{"no version in the first line", "product: image\nrelease_commit:\n  message: \"chore: release\\n\\n${version}\"\n", "chore: release", "", false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			cfg, err := Parse(strings.NewReader(c.yaml), "t.yaml")
+			if err != nil {
+				t.Fatal(err)
+			}
+			v, ok := cfg.VersionFromReleaseSubject(c.subject)
+			if ok != c.ok || (ok && v.String() != c.want) {
+				t.Errorf("got %s %t, want %s %t", v, ok, c.want, c.ok)
+			}
+		})
+	}
+}

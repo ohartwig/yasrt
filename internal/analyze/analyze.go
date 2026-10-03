@@ -145,6 +145,10 @@ func Run(repo *git.Repo, cfg *config.Config, opts Options, log *slog.Logger) (*R
 		return nil, err
 	}
 	res.Warnings = base.Warnings
+	cut, err := highestCut(repo, cfg, ref)
+	if err != nil {
+		return nil, err
+	}
 
 	res.Branch = resolveBranch(repo, opts.Branch)
 	preID, isPrerelease := cfg.PrereleaseFor(res.Branch)
@@ -158,6 +162,7 @@ func Run(repo *git.Repo, cfg *config.Config, opts Options, log *slog.Logger) (*R
 		// anything outside it is not a predecessor — a 2.0.0 tag reachable
 		// from 1.x is history, not a baseline.
 		base = base.restrictTo(maintRange)
+		cut = cut.restrictTo(maintRange)
 	}
 
 	// The notes and the changed paths are measured from the last release of any
@@ -224,6 +229,9 @@ func Run(repo *git.Repo, cfg *config.Config, opts Options, log *slog.Logger) (*R
 		if res.HasPrevious && !res.PreviousVersion.Less(v) {
 			return nil, fmt.Errorf("%w: %s is not higher than %s", ErrVersionNotHigher, v, res.PreviousVersion)
 		}
+		if cut.ok && !cut.version.Less(v) {
+			return nil, fmt.Errorf("%w: %s is not higher than %s, which a release commit already cut", ErrVersionNotHigher, v, cut.version)
+		}
 		res.Version, explicit = v, true
 		res.Reason = ReasonForced
 		res.Bump = inferBump(res.PreviousVersion, v, res.HasPrevious)
@@ -238,6 +246,28 @@ func Run(repo *git.Repo, cfg *config.Config, opts Options, log *slog.Logger) (*R
 		res.Bump, res.Reason = b, ReasonForced
 	}
 
+	// Counting on from an untagged cut, the bump is what came after its
+	// release commit: what came before it was in that release already, and
+	// counting it again turned a withdrawn 1.1.0 plus a fix into 1.2.0. Its
+	// content still has to ship, though - the tag that carried it is gone -
+	// so it goes out as a patch when nothing since asks for more.
+	overCut := !explicit && opts.Force == "" && cut.ok && (!base.HasStable || base.Stable.Less(cut.version))
+	if overCut {
+		since, err := repo.Log(cut.sha, ref)
+		if err != nil {
+			return nil, err
+		}
+		parsedSince := make([]conventional.Commit, 0, len(since))
+		for _, rc := range since {
+			parsedSince = append(parsedSince, conventional.Parse(rc.SHA, rc.ShortSHA, rc.AuthorName, rc.AuthorEmail, rc.Message))
+		}
+		if b := rules.Evaluate(parsedSince, cfg).Bump; b != semver.None {
+			res.Bump = b
+		} else if res.Bump != semver.None {
+			res.Bump = semver.Patch
+		}
+	}
+
 	if res.Bump == semver.None && !explicit {
 		res.Status = StatusNoBump
 		return res, nil
@@ -245,8 +275,22 @@ func Run(repo *git.Repo, cfg *config.Config, opts Options, log *slog.Logger) (*R
 
 	if !explicit {
 		var core semver.Version
-		if base.HasStable {
-			core = base.Stable.Next(res.Bump, cfg.MajorOnZero())
+		from, hasFrom := base.Stable, base.HasStable
+		// A version is cut once. A release whose tag was taken back - the
+		// component's sweep withdraws the tag of a failed or canceled tag
+		// pipeline - leaves its release commit, and often an artefact a
+		// consumer already pinned. Counting on from the tags alone cut that
+		// number again, or a lower one: pinup v0.53.0 was withdrawn on
+		// 2026-10-02, the next releases were 0.52.1 to 0.52.4, and the image
+		// that had pinned the orphaned 0.53.0 package saw none of them.
+		if cut.ok && (!hasFrom || from.Less(cut.version)) {
+			res.Warnings = append(res.Warnings, fmt.Sprintf(
+				"release commit %q cut %s, which has no tag (withdrawn?); counting on from it, not from %s",
+				cut.subject, cut.version, base.StableTag))
+			from, hasFrom = cut.version, true
+		}
+		if hasFrom {
+			core = from.Next(res.Bump, cfg.MajorOnZero())
 		} else {
 			// First release: the configured starting point, not a bump of it.
 			v, err := semver.Parse(cfg.Versioning.Initial)
@@ -416,6 +460,46 @@ func findBaseline(repo *git.Repo, cfg *config.Config, ref string, excludeTags []
 			len(foreign), cfg.TagFormatString(), foreign))
 	}
 	return b, nil
+}
+
+// cutRelease is the highest stable version a release commit reachable from
+// the analysed ref names, tagged or not.
+type cutRelease struct {
+	version semver.Version
+	subject string
+	sha     string
+	ok      bool
+}
+
+func (c cutRelease) restrictTo(r config.Range) cutRelease {
+	if c.ok && !r.Contains(c.version) {
+		return cutRelease{}
+	}
+	return c
+}
+
+// highestCut reads the release commits of this configuration's message out
+// of the history. Without a release commit (release_commit disabled) there is
+// nothing to read, and the tags stay the only record.
+func highestCut(repo *git.Repo, cfg *config.Config, ref string) (cutRelease, error) {
+	var best cutRelease
+	if !cfg.ReleaseCommitEnabled() {
+		return best, nil
+	}
+	subjects, err := repo.Subjects(ref)
+	if err != nil {
+		return best, err
+	}
+	for _, s := range subjects {
+		v, ok := cfg.VersionFromReleaseSubject(s.Text)
+		if !ok || v.Pre != "" {
+			continue
+		}
+		if !best.ok || best.version.Less(v) {
+			best = cutRelease{version: v, subject: s.Text, sha: s.SHA, ok: true}
+		}
+	}
+	return best, nil
 }
 
 // nextPrerelease turns a core version into the next counter for an identifier:

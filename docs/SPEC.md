@@ -353,6 +353,7 @@ Comparing `<lastTag>..HEAD` is the fix, and it is a behaviour change to be measu
 **Flow:**
 
 1. Determine last release: highest tag matching `tag_format` that is an ancestor of HEAD (`git tag --merged HEAD`). No tag ⇒ `versioning.initial` as candidate, all commits count.
+   **A version is cut once.** The highest stable version named by a release commit reachable from HEAD (the first line of `release_commit.message`, `${version}` or `${tag}` read back) is a floor as well: when it is higher than the last tag - a release whose tag was withdrawn, e.g. by the component's sweep after a failed or canceled tag pipeline - the next version is counted on from it, never re-cut or undercut, and a warning names it. The bump then comes from the commits after that release commit; when none of them releases, the withdrawn content still ships as a patch. `--version` must be higher than that floor too. With `release_commit.enabled: false` there is nothing to read and the tags alone decide.
 2. Read commits `lastTag..HEAD` (`git log --format=...`), parse. Ignore if scope, author or trailer matches `ignore`. Non-conforming commits count as "no release" and are not listed in the notes (but appear in the debug log).
 3. Determine bump: first matching rule per commit; highest bump across all commits. `major_on_zero: false` lowers `major` to `minor` while current < 1.0.0.
 4. Deliverability (F3): changed paths `lastTag..HEAD`; if **all** paths match `non_release_paths` ⇒ not deliverable.
@@ -585,6 +586,7 @@ Output in the job log: "would release 3.4.0 (minor)" / "not deliverable: only do
 | Squash merge without conventional title | commit does not count; README recommends squash template `%{title}` + MR title lint |
 | Several breaking changes | one major bump, all listed in the `:boom:` block |
 | `--version` lower than last release | exit `2` |
+| Tag of a release withdrawn, its release commit still on the branch | counted on from the withdrawn version (6.1 step 1): pinup v0.53.0, withdrawn 2026-10-02, was followed by 0.52.1-0.52.4 before this rule, and a consumer pinned to the orphaned 0.53.0 artefact saw none of them |
 | Re-run after partial failure | see 6.2, idempotent via tag existence |
 | Concurrent push during `release` | `RELEASE_COMMIT != HEAD` ⇒ exit `5`; `resource_group` prevents parallel `release` jobs |
 | Push setting not enabled | `git push` fails with 403; message points to `yasrt check` |

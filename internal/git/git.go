@@ -206,6 +206,26 @@ func (r *Repo) MergedTags(ref string) ([]string, error) {
 	return splitLines(out), nil
 }
 
+// Subject is one commit's SHA and subject line.
+type Subject struct{ SHA, Text string }
+
+// Subjects lists the subject line of every commit reachable from ref, newest
+// first: what the release commits a withdrawn tag left behind are read from.
+func (r *Repo) Subjects(ref string) ([]Subject, error) {
+	out, err := r.run("log", "--format=%H"+fieldSep+"%s", ref)
+	if err != nil {
+		return nil, err
+	}
+	var subjects []Subject
+	for _, line := range splitLines(out) {
+		sha, text, ok := strings.Cut(line, fieldSep)
+		if ok {
+			subjects = append(subjects, Subject{SHA: sha, Text: text})
+		}
+	}
+	return subjects, nil
+}
+
 // AllTags lists every tag, used only to warn about foreign tag formats.
 func (r *Repo) AllTags() ([]string, error) {
 	out, err := r.run("tag", "--list")

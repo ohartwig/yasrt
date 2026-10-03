@@ -650,3 +650,90 @@ func TestTagFormatChangeKeepsTheHistory(t *testing.T) {
 		t.Errorf("without previous_tag_formats the old tag must be foreign; got %s", res.Version)
 	}
 }
+
+// A version is cut once. The component's sweep takes back the tag of a tag
+// pipeline that failed or was canceled; the release commit stays, and so does
+// whatever artefact was published before the cancel. pinup v0.53.0, 2026-10-02:
+// counted on from the remaining tags, the next releases were 0.52.1 to 0.52.4,
+// and the image that had pinned the orphaned 0.53.0 package saw none of them.
+func TestAWithdrawnReleaseIsNeverCutAgainOrUndercut(t *testing.T) {
+	for _, c := range []struct {
+		name    string
+		then    func(tr *testrepo.Repo)
+		want    string
+		warning bool
+	}{
+		{"a fix after the withdrawal", func(tr *testrepo.Repo) {
+			tr.CommitFile("src/c.go", "3", "fix: after the withdrawal")
+		}, "1.1.1", true},
+		{"a feat after the withdrawal", func(tr *testrepo.Repo) {
+			tr.CommitFile("src/c.go", "3", "feat: after the withdrawal")
+		}, "1.2.0", true},
+		{"lower releases cut since, by the old behaviour", func(tr *testrepo.Repo) {
+			tr.CommitFile("src/c.go", "3", "fix: one")
+			tr.CommitFile("CHANGELOG.md", "c\n", "chore(release): 1.0.1")
+			tr.Tag("1.0.1")
+			tr.CommitFile("src/d.go", "4", "feat: two")
+		}, "1.2.0", true},
+		{"only a build fix after the withdrawal: its content still ships", func(tr *testrepo.Repo) {
+			tr.CommitFile(".gitlab-ci.yml", "x", "ci: fix the tag pipeline")
+		}, "1.1.1", true},
+		{"a newer tag above it", func(tr *testrepo.Repo) {
+			tr.CommitFile("src/c.go", "3", "feat: re-cut")
+			tr.CommitFile("CHANGELOG.md", "c\n", "chore(release): 1.2.0")
+			tr.Tag("1.2.0")
+			tr.CommitFile("src/d.go", "4", "fix: next")
+		}, "1.2.1", false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			tr := testrepo.New(t)
+			tr.CommitFile("src/main.go", "1", "feat: first")
+			tr.CommitFile("CHANGELOG.md", "a\n", "chore(release): 1.0.0")
+			tr.Tag("1.0.0")
+			tr.CommitFile("src/b.go", "2", "feat: withdrawn later")
+			tr.CommitFile("CHANGELOG.md", "b\n", "chore(release): 1.1.0") // its tag was taken back
+			c.then(tr)
+
+			res := run(t, tr, cfg(t, "product: image\n"), analyze.Options{})
+			if res.Status != analyze.StatusRelease || res.Version.String() != c.want {
+				t.Fatalf("status %s, version %s, want %s", res.Status, res.Version, c.want)
+			}
+			warned := false
+			for _, w := range res.Warnings {
+				warned = warned || strings.Contains(w, "1.1.0, which has no tag")
+			}
+			if warned != c.warning {
+				t.Errorf("warning %t, want %t: %v", warned, c.warning, res.Warnings)
+			}
+		})
+	}
+}
+
+func TestAnExplicitVersionCannotReuseAWithdrawnOne(t *testing.T) {
+	tr := testrepo.New(t)
+	tr.CommitFile("src/main.go", "1", "feat: first")
+	tr.Tag("1.0.0")
+	tr.CommitFile("src/b.go", "2", "feat: withdrawn later")
+	tr.CommitFile("CHANGELOG.md", "b\n", "chore(release): 1.1.0")
+	tr.CommitFile("src/c.go", "3", "fix: after")
+
+	err := runErr(t, tr, cfg(t, "product: image\n"), analyze.Options{Version: "1.1.0"})
+	if !errors.Is(err, analyze.ErrVersionNotHigher) {
+		t.Errorf("err = %v", err)
+	}
+}
+
+// Without release commits there is nothing in the history to read: the tags
+// stay the only record, as before.
+func TestWithoutReleaseCommitsTheTagsDecide(t *testing.T) {
+	tr := testrepo.New(t)
+	tr.CommitFile("src/main.go", "1", "feat: first")
+	tr.Tag("1.0.0")
+	tr.CommitFile("src/b.go", "2", "chore(release): 1.1.0")
+	tr.CommitFile("src/c.go", "3", "fix: after")
+
+	res := run(t, tr, cfg(t, "product: image\nrelease_commit:\n  enabled: false\n"), analyze.Options{})
+	if res.Version.String() != "1.0.1" {
+		t.Errorf("version %s, want 1.0.1", res.Version)
+	}
+}

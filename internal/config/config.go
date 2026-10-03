@@ -627,6 +627,34 @@ func (vars Vars) Expand(tmpl string) string {
 	return strings.ReplaceAll(out, NotesPlaceholder, vars.Notes)
 }
 
+// VersionFromReleaseSubject reads the version out of the subject of a release
+// commit this configuration writes: release_commit.message's first line with
+// ${version} or ${tag} in it. False for any other subject, and for a message
+// whose first line names neither.
+func (c *Config) VersionFromReleaseSubject(subject string) (semver.Version, bool) {
+	first, _, _ := strings.Cut(c.ReleaseCommit.Message, "\n")
+	if !strings.Contains(first, VersionPlaceholder) && !strings.Contains(first, TagPlaceholder) {
+		return semver.Version{}, false
+	}
+	pattern := regexp.QuoteMeta(first)
+	pattern = strings.ReplaceAll(pattern, regexp.QuoteMeta(VersionPlaceholder), `(?P<version>\S+)`)
+	pattern = strings.ReplaceAll(pattern, regexp.QuoteMeta(TagPlaceholder), `(?P<tag>\S+)`)
+	pattern = strings.ReplaceAll(pattern, regexp.QuoteMeta(NotesPlaceholder), `.*`)
+	re, err := regexp.Compile("^" + pattern + "$")
+	if err != nil {
+		return semver.Version{}, false
+	}
+	m := re.FindStringSubmatch(strings.TrimSpace(subject))
+	if m == nil {
+		return semver.Version{}, false
+	}
+	if i := re.SubexpIndex("version"); i > 0 {
+		v, err := semver.Parse(m[i])
+		return v, err == nil
+	}
+	return c.VersionFromTag(m[re.SubexpIndex("tag")])
+}
+
 // Expand is the shorthand for templates that cannot refer to the notes.
 func Expand(tmpl string, v semver.Version, tag string) string {
 	return Vars{Version: v, Tag: tag}.Expand(tmpl)

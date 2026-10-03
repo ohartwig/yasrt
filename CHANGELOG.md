@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.13.6](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.5...v1.13.6) (2026-10-03)
+
+### :bug: Fixes
+
+* **analyze:** a withdrawn version is never cut again or undercut ([3be6ce8](https://git.ole-hartwig.eu/yasrt/cli/commit/3be6ce8c733d0692bc6019117631387337daa556))
+
+### :repeat: Continuous Integrations
+
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 8aba71a ([6d55644](https://git.ole-hartwig.eu/yasrt/cli/commit/6d55644bbe2e8061216d9cb6eeb7f2549cc9bc00))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to c8b7a25 ([2d849be](https://git.ole-hartwig.eu/yasrt/cli/commit/2d849be22dbfdb74310db059e31a0590f3714f7e))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 00a20bb ([cd556eb](https://git.ole-hartwig.eu/yasrt/cli/commit/cd556ebc4b8ffba4f1a87cb12b673c4337898c39))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 61a0194 ([6df73cb](https://git.ole-hartwig.eu/yasrt/cli/commit/6df73cb011a8bcbe6c4870035b8a4cfacb399ccc))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 1ee506a ([dd47e38](https://git.ole-hartwig.eu/yasrt/cli/commit/dd47e388261555f86956e34ade51f3100db3282e))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to b2731ec ([0ef9329](https://git.ole-hartwig.eu/yasrt/cli/commit/0ef9329b2f44eccae8afe5427bd98052cc2c18c4))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to cfd45ff ([6949703](https://git.ole-hartwig.eu/yasrt/cli/commit/6949703655c3f35f5f1a210f079259a692a342fc))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to e43e41f ([52a41f8](https://git.ole-hartwig.eu/yasrt/cli/commit/52a41f89e521e4fa3742188129848cb309d5fd61))
+
 ## [1.13.5](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.4...v1.13.5) (2026-09-28)
 
 ### :repeat: Chores

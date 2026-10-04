@@ -47,6 +47,27 @@ applicable, request a CVE. The fixed version is named in the release notes of
 the affected repository. The reporter is credited unless they ask to remain
 anonymous.
 
+## Safe harbor
+
+Research done in good faith under this policy is authorised. We will not take
+legal action against you or report you to law enforcement for it, and if a
+third party does, we will make it known that you acted under this policy.
+
+Good faith means that you:
+
+- test only what is in scope below, and only as far as needed to show the
+  issue
+- do not access, change, keep or share other people's data; stop and tell us
+  if you reach any
+- do not degrade a service, and do not use social engineering or physical
+  attacks
+- give us the time stated above before you disclose anything
+
+If you are unsure whether something is covered, ask at
+<security@ole-hartwig.eu> before you test. This safe harbor covers our own
+systems only. It cannot authorise testing of third-party services, which stay
+governed by their own terms.
+
 ## Scope
 
 In scope:

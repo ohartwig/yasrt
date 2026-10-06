@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.13.7](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.6...v1.13.7) (2026-10-06)
+
+### :repeat: Continuous Integrations
+
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 9b66cc3 ([c6d2dc8](https://git.ole-hartwig.eu/yasrt/cli/commit/c6d2dc8de42a4ee13ca809b40f40f05646fe98c6))
+
+### :repeat: Chores
+
+* **repo-templates:** sync ([5ecdf9a](https://git.ole-hartwig.eu/yasrt/cli/commit/5ecdf9aafb10924529227d4a0895023f8b950eb9))
+
 ## [1.13.6](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.5...v1.13.6) (2026-10-03)
 
 ### :bug: Fixes

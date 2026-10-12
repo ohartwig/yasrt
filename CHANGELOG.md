@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.13.8](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.7...v1.13.8) (2026-10-12)
+
+### :bug: Fixes
+
+* **deps:** build with Go 1.27.2 and pin the exact Go tag ([53c281d](https://git.ole-hartwig.eu/yasrt/cli/commit/53c281d805e80ff8655a91c871f19b36e5107134))
+
+### :repeat: Continuous Integrations
+
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 7c330e9 ([88d1214](https://git.ole-hartwig.eu/yasrt/cli/commit/88d121447a03cce237e6d635a045eb610d33eaf3))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 93ef9ec ([5cf044a](https://git.ole-hartwig.eu/yasrt/cli/commit/5cf044a9f0d2aaef61ab1368705119929be03ce2))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 6fad3a1 ([a32deb8](https://git.ole-hartwig.eu/yasrt/cli/commit/a32deb84f085ee8ad72993ef62feea0a2b8debf1))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to bf18713 ([6145ac5](https://git.ole-hartwig.eu/yasrt/cli/commit/6145ac5693f2ec6d0e68feb3e3a7d8f1dc365947))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to fa60636 ([d728377](https://git.ole-hartwig.eu/yasrt/cli/commit/d728377cc776cfcd88d385826db770d94a501497))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 5fcd679 ([05ebed1](https://git.ole-hartwig.eu/yasrt/cli/commit/05ebed1c12d63b487c6ed2696eaa323bbea820f5))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to e141596 ([a9117d8](https://git.ole-hartwig.eu/yasrt/cli/commit/a9117d833c2efac92b92d05b6c991cc11d8c7703))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 4ac7ea4 ([5ae613c](https://git.ole-hartwig.eu/yasrt/cli/commit/5ae613ce26133a995bc347b8bebf518b2962b6fe))
+
 ## [1.13.7](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.6...v1.13.7) (2026-10-06)
 
 ### :repeat: Continuous Integrations

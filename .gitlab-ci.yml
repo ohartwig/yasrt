@@ -10,7 +10,15 @@ stages: [quick, test, version, build, release, sign]
 variables:
   GIT_DEPTH: 0
   GIT_STRATEGY: clone
-  GO_IMAGE: registry.ole-hartwig.eu/devops/images/golang:1.27
+  # The exact Go version, not the rolling 1.27: a Go patch in
+  # devops/images/golang changes no file here, so with the rolling tag nothing
+  # cut a release and the binary kept the old standard library. pinup offers
+  # the next patch tag once the image carries it, as fix(deps), which releases
+  # (pinup/runner!40). The tag on a variable of its own: the annotation
+  # manager reads a quoted version, not an image reference.
+  # pinup: datasource=docker depName=registry.ole-hartwig.eu/devops/images/golang
+  GOLANG_IMAGE_TAG: "1.27.2"
+  GO_IMAGE: "registry.ole-hartwig.eu/devops/images/golang:$GOLANG_IMAGE_TAG"
   GOTOOLCHAIN: local
   GOFLAGS: -mod=readonly
   GOPATH: ${CI_PROJECT_DIR}/.go
@@ -19,7 +27,7 @@ include:
   - component: ${CI_SERVER_HOST}/devops/ci-cd-components/composed-default-pipelines/go@2
     inputs:
       working-directory: .
-      go-image: registry.ole-hartwig.eu/devops/images/golang:1.27
+      go-image: $GO_IMAGE
       test-args: "-race -coverprofile=coverage.out ./..."
   - component: ${CI_SERVER_HOST}/devops/ci-cd-components/lint-tools/lint-ci-yaml@1
     inputs:
@@ -42,7 +50,7 @@ include:
     inputs:
       stage-version: version
       stage-release: release
-      yasrt-image: registry.ole-hartwig.eu/devops/images/golang:1.27
+      yasrt-image: $GO_IMAGE
       mr-comments: 'true'
       # A release here has one first-party consumer, devops/images/yasrt, and
       # it should not wait for the hourly scan: the fast lane goes through

@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.13.9](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.8...v1.13.9) (2026-10-12)
+
+### :bug: Fixes
+
+* **deps:** update module github.com/bmatcuk/doublestar/v4 to v4.10.3 ([241b339](https://git.ole-hartwig.eu/yasrt/cli/commit/241b3399c7dadeadaa7de58fbd65c01d382d87a9))
+
+### :repeat: Continuous Integrations
+
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to be5bc13 ([339f082](https://git.ole-hartwig.eu/yasrt/cli/commit/339f082745d52dc720322691671b06b58a163c48))
+
 ## [1.13.8](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.7...v1.13.8) (2026-10-12)
 
 ### :bug: Fixes

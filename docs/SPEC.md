@@ -386,7 +386,7 @@ For `no-bump` / `not-deliverable`, `RELEASE_VERSION`/`RELEASE_TAG` are empty.
 
 - `RELEASE_STATUS == release`.
 - `RELEASE_COMMIT == HEAD`. Prevents tagging something other than what was built after an intermediate push.
-- Tag does not exist remotely (`git ls-remote --tags`). If it exists on exactly `RELEASE_COMMIT` ⇒ idempotency: skip all completed steps, finish the rest. If it exists on a different commit ⇒ abort, exit `5`.
+- Tag does not exist remotely (`git ls-remote --tags`). If it exists on exactly `RELEASE_COMMIT` ⇒ idempotency: skip all completed steps, finish the rest. If it exists on a different commit ⇒ abort, exit `5` — unless `--on-tag-conflict renumber` (or `YASRT_ON_TAG_CONFLICT=renumber`): then fetch the remote's tags, run the analysis again at `RELEASE_COMMIT`, and release the number it yields, or end with `skip:` and exit `0` when the commits left over do not bump. Only for repositories whose artefact is built from the tag; a build that carried the stale number must not be re-labelled.
 
 **Flow, in this order:**
 

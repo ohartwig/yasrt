@@ -378,6 +378,15 @@ func (r *Repo) FetchRef(remote, ref string) (string, error) {
 	return r.run("rev-parse", "FETCH_HEAD")
 }
 
+// FetchTags brings the remote's tags into the local repository. A CI checkout
+// is taken when the pipeline starts; a tag that a sibling pipeline published in
+// the meantime is not in it, and that tag is exactly what `release` has to see
+// before it can renumber.
+func (r *Repo) FetchTags(remote string) error {
+	_, err := r.run("fetch", "--quiet", "--tags", remote)
+	return err
+}
+
 // ResetHard moves HEAD and the work tree to a commit.
 func (r *Repo) ResetHard(sha string) error {
 	_, err := r.run("reset", "--quiet", "--hard", sha)

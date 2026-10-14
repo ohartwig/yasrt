@@ -76,6 +76,7 @@ Three commands, two of which write nothing:
 yasrt next --output .release.env   # decide; writes nothing to the repository
 yasrt check                        # validate config, probe the environment
 yasrt release                      # publish; idempotent, safe to re-run
+yasrt release --on-tag-conflict renumber   # a sibling pipeline took the number: release the next one
 ```
 
 `next` leaves its decision in a dotenv file — `RELEASE_STATUS` is one of
@@ -92,7 +93,7 @@ was analysed. These keys and the exit codes are a public interface:
 | 2 | invalid arguments |
 | 3 | `no-bump`, with `--fail-on-skip` |
 | 4 | `not-deliverable`, with `--fail-on-skip` |
-| 5 | the repository moved: HEAD changed, or the tag exists on another commit |
+| 5 | the repository moved: HEAD changed, or the tag exists on another commit (see `--on-tag-conflict`) |
 
 ### GitLab CI
 

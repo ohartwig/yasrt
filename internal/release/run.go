@@ -42,6 +42,24 @@ var (
 	ErrSigningRequired = errors.New("release_commit.sign is `required` but no usable signing key is available")
 )
 
+// TagConflictPolicy says what `release` does when the tag it was asked to
+// publish already exists on another commit: two merges in close succession
+// both ran `next` before either had tagged, and both arrived at the same
+// number.
+type TagConflictPolicy string
+
+const (
+	// TagConflictFail stops with ErrTagMismatch (exit 5). The default, because
+	// a build in the same pipeline may carry the number from `next`, and a tag
+	// that disagrees with the artefact is worse than no tag.
+	TagConflictFail TagConflictPolicy = "fail"
+	// TagConflictRenumber fetches the remote's tags, analyses the same commit
+	// again and releases the number that comes out -- or nothing, when the
+	// commits left over do not bump. Safe where the artefact is built from the
+	// tag (a tag pipeline), so no build has used the stale number.
+	TagConflictRenumber TagConflictPolicy = "renumber"
+)
+
 // StepStatus records what happened to one step of the release.
 type StepStatus string
 
@@ -79,6 +97,9 @@ type Report struct {
 	Triggers      []TriggerResult `json:"triggers,omitzero"`
 	Hooks         []hooks.Result  `json:"hooks,omitzero"`
 	Notes         string          `json:"notes,omitzero"`
+	// Skipped says why nothing was released although the run succeeded: the
+	// tag was taken by a sibling pipeline and, renumbered, nothing was left.
+	Skipped string `json:"skipped,omitzero"`
 }
 
 // Options configure a release run.
@@ -95,6 +116,10 @@ type Options struct {
 	Branch    string // branch to push the release commit to; default: current
 	Token     string // CI token, injected into the push URL
 	GPGKeyB64 string // optional signing key
+
+	// OnTagConflict decides between failing and renumbering when the tag is
+	// taken. Empty means TagConflictFail.
+	OnTagConflict TagConflictPolicy
 
 	Now    time.Time
 	DryRun bool
@@ -157,7 +182,7 @@ func Run(ctx context.Context, o Options) (*Report, error) {
 	if log == nil {
 		log = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
-	rep, err := run(ctx, o, log)
+	rep, err := run(ctx, &o, log)
 	if err == nil || o.Config == nil {
 		return rep, err
 	}
@@ -186,7 +211,7 @@ func (r *Report) failedStep() string {
 	return ""
 }
 
-func run(ctx context.Context, o Options, log *slog.Logger) (*Report, error) {
+func run(ctx context.Context, o *Options, log *slog.Logger) (*Report, error) {
 	res, cfg, repo := o.Result, o.Config, o.Repo
 	rep := &Report{Version: res.Version.String(), Tag: res.Tag, TagSHA: res.Commit}
 
@@ -207,8 +232,39 @@ func run(ctx context.Context, o Options, log *slog.Logger) (*Report, error) {
 		return rep, err
 	}
 	if tagOnRemote && remoteSHA != res.Commit {
-		return rep, fmt.Errorf("%w: %s points at %s, not at %s",
-			ErrTagMismatch, res.Tag, short(remoteSHA), short(res.Commit))
+		if o.OnTagConflict != TagConflictRenumber {
+			return rep, fmt.Errorf("%w: %s points at %s, not at %s",
+				ErrTagMismatch, res.Tag, short(remoteSHA), short(res.Commit))
+		}
+		// A sibling pipeline released first. The number is gone; the commits
+		// are not. Ask the analysis again with the remote's tags in view and
+		// release what it says -- or nothing, when what is left does not bump.
+		if err := repo.FetchTags(o.remote()); err != nil {
+			return rep, err
+		}
+		again, err := analyze.Run(repo, cfg, analyze.Options{Ref: res.Commit, Branch: res.Branch}, log)
+		if err != nil {
+			return rep, err
+		}
+		taken := fmt.Sprintf("%s was taken by %s", res.Tag, short(remoteSHA))
+		if !again.Releasing() {
+			rep.Skipped = fmt.Sprintf("%s; at %s nothing is left to release (%s)", taken, short(res.Commit), again.Reason)
+			rep.Steps = append(rep.Steps, Step{Name: "renumber", Status: StepSkipped, Detail: rep.Skipped})
+			log.Info("tag taken, nothing left to release", "tag", res.Tag, "by", short(remoteSHA), "status", string(again.Status))
+			return rep, nil
+		}
+		log.Info("tag taken, releasing the next number instead", "taken", res.Tag, "by", short(remoteSHA), "now", again.Tag)
+		rep.Steps = append(rep.Steps, Step{Name: "renumber", Status: StepDone, Detail: taken + "; releasing " + again.Tag + " instead"})
+		res, o.Result = again, again
+		rep.Version, rep.Tag, rep.TagSHA = res.Version.String(), res.Tag, res.Commit
+		remoteSHA, tagOnRemote, err = repo.RemoteTagSHA(o.remote(), res.Tag)
+		if err != nil {
+			return rep, err
+		}
+		if tagOnRemote && remoteSHA != res.Commit {
+			return rep, fmt.Errorf("%w: %s points at %s, not at %s (after renumbering)",
+				ErrTagMismatch, res.Tag, short(remoteSHA), short(res.Commit))
+		}
 	}
 
 	// Precondition: what we are about to tag must still be HEAD, so that a push
@@ -351,7 +407,7 @@ func run(ctx context.Context, o Options, log *slog.Logger) (*Report, error) {
 
 	// Step 4: the release commit, after the tag on purpose.
 	if cfg.ReleaseCommitEnabled() {
-		st, detail, sha, err := commitChangelog(repo, cfg, res, o, in, sign, changelogStaged, notes, log)
+		st, detail, sha, err := commitChangelog(repo, cfg, res, *o, in, sign, changelogStaged, notes, log)
 		rep.Steps = append(rep.Steps, Step{Name: "release-commit", Status: st, Detail: detail})
 		if err != nil {
 			return rep, err
@@ -363,7 +419,7 @@ func run(ctx context.Context, o Options, log *slog.Logger) (*Report, error) {
 
 	// Step 5: the GitLab release.
 	if cfg.GitLabReleaseEnabled() && o.Forge != nil {
-		url, st, detail, err := publishRelease(ctx, o, cfg, res, notes, log)
+		url, st, detail, err := publishRelease(ctx, *o, cfg, res, notes, log)
 		rep.Steps = append(rep.Steps, Step{Name: "release", Status: st, Detail: detail})
 		if err != nil {
 			return rep, err
@@ -374,7 +430,7 @@ func run(ctx context.Context, o Options, log *slog.Logger) (*Report, error) {
 	}
 
 	// Step 6: follow-up triggers. Never fatal.
-	rep.Triggers = runTriggers(ctx, o, cfg, res, log)
+	rep.Triggers = runTriggers(ctx, *o, cfg, res, log)
 	rep.Steps = append(rep.Steps, Step{Name: "triggers", Status: StepDone,
 		Detail: fmt.Sprintf("%d configured", len(cfg.AfterRelease.Triggers))})
 

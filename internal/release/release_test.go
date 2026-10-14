@@ -308,6 +308,62 @@ func TestRefusesWhenTagExistsElsewhere(t *testing.T) {
 	}
 }
 
+// Two merges in close succession both computed 1.1.0; the sibling tagged
+// first. With renumbering the number is recomputed against the remote's tags
+// and the release goes out as 1.2.0 instead of failing.
+func TestRenumbersWhenTagExistsElsewhere(t *testing.T) {
+	s := setup(t, "product: image\n")
+	s.tr.Git("tag", "-a", "-m", "1.1.0", "1.1.0", "HEAD~1")
+	s.tr.Git("push", "-q", "origin", "1.1.0")
+	s.tr.Git("tag", "-d", "1.1.0")
+
+	o := s.opts()
+	o.OnTagConflict = release.TagConflictRenumber
+	rep := run(t, o)
+	if rep.Tag != "1.2.0" || rep.Skipped != "" {
+		t.Fatalf("tag = %q, skipped = %q; want 1.2.0", rep.Tag, rep.Skipped)
+	}
+	if got := s.tr.RemoteTags(); !slices.Contains(got, "1.2.0") {
+		t.Errorf("remote tags = %q", got)
+	}
+	if got := stepStatus(rep, "renumber"); got != release.StepDone {
+		t.Errorf("renumber step = %q, want done", got)
+	}
+	if s.gl.creates.Load() != 1 {
+		t.Errorf("creates = %d", s.gl.creates.Load())
+	}
+}
+
+// The sibling's release already covered every releasable commit; what is left
+// at this commit does not bump. Renumbering must then end quietly, not with a
+// red job and not with a tag.
+func TestRenumberSkipsWhenNothingIsLeft(t *testing.T) {
+	s := setup(t, "product: image\n")
+	feat := s.tr.Head()
+	s.tr.CommitFile("docs/note.md", "x", "docs: a note nobody releases for")
+	res, err := analyze.Run(s.repo, s.cfg, analyze.Options{}, discard)
+	if err != nil || !res.Releasing() || res.Tag != "1.1.0" {
+		t.Fatalf("precondition: %v %+v", err, res)
+	}
+	s.res = res
+	s.tr.Git("tag", "-a", "-m", "1.1.0", "1.1.0", feat)
+	s.tr.Git("push", "-q", "origin", "1.1.0")
+	s.tr.Git("tag", "-d", "1.1.0")
+
+	o := s.opts()
+	o.OnTagConflict = release.TagConflictRenumber
+	rep := run(t, o)
+	if rep.Skipped == "" {
+		t.Fatalf("expected a skip, got tag %q", rep.Tag)
+	}
+	if got := s.tr.RemoteTags(); len(got) != 2 {
+		t.Errorf("remote tags = %q, want only 1.0.0 and 1.1.0", got)
+	}
+	if s.gl.creates.Load() != 0 {
+		t.Errorf("creates = %d", s.gl.creates.Load())
+	}
+}
+
 // A re-run after a completed release must converge without duplicating anything.
 func TestRerunIsIdempotent(t *testing.T) {
 	s := setup(t, "product: image\n")

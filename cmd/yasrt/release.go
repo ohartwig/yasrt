@@ -31,6 +31,7 @@ func cmdRelease(args []string) error {
 		forgeKind  string
 		dryRun     bool
 		dir        string
+		onConflict string
 	)
 	fs := flag.NewFlagSet("yasrt release", flag.ContinueOnError)
 	common.register(fs)
@@ -42,6 +43,10 @@ func cmdRelease(args []string) error {
 	fs.StringVar(&forgeKind, "forge", os.Getenv("YASRT_FORGE"),
 		"gitlab, github or forgejo; detected from the CI environment when empty")
 	fs.BoolVar(&dryRun, "dry-run", false, "render everything, write nothing")
+	fs.StringVar(&onConflict, "on-tag-conflict", cmp.Or(os.Getenv("YASRT_ON_TAG_CONFLICT"), string(release.TagConflictFail)),
+		"fail or renumber: what to do when the tag already exists on another commit because a sibling pipeline released first. "+
+			"renumber analyses the same commit again against the remote's tags and releases the next number, or nothing; "+
+			"only for repositories whose artefact is built from the tag")
 	fs.StringVar(&dir, "dir", ".", "repository directory")
 	fs.Usage = func() {
 		fmt.Fprint(os.Stderr, "yasrt release — publish the release decided by `yasrt next`.\n\n")
@@ -49,6 +54,10 @@ func cmdRelease(args []string) error {
 	}
 	if err := parse(fs, args); err != nil {
 		return err
+	}
+	policy := release.TagConflictPolicy(onConflict)
+	if policy != release.TagConflictFail && policy != release.TagConflictRenumber {
+		return codeErr(exitUsage, "--on-tag-conflict must be fail or renumber, not %q", onConflict)
 	}
 
 	env, detected := forge.Detect(forge.OSGetenv)
@@ -99,6 +108,8 @@ func cmdRelease(args []string) error {
 		GPGKeyB64: os.Getenv(gpgVar),
 		DryRun:    dryRun,
 		Log:       log,
+
+		OnTagConflict: policy,
 	})
 
 	// The report is written even on failure: it is how a human sees how far the
@@ -114,6 +125,10 @@ func cmdRelease(args []string) error {
 
 	if common.json {
 		return release.WriteReport("/dev/stdout", rep)
+	}
+	if rep.Skipped != "" {
+		fmt.Printf("skip: %s\n", rep.Skipped)
+		return nil
 	}
 	fmt.Printf("released %s as %s\n", rep.Version, rep.Tag)
 	if rep.ReleaseURL != "" {

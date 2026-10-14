@@ -12,6 +12,18 @@ tag_format: "v${version}"
 versioning:
   previous_tag_formats: ["${version}"]
 
+# Own rules instead of the shared defaults' chore -> patch. Every change that
+# reaches the binary arrives as fix(deps) (Go image tag, modules) or as
+# feat/fix; chore and ci commits here are CI digest pins and repo-template
+# syncs. Under the default they cut v1.13.2, .4, .5 and .7 with nothing in
+# them for a user. Lists replace the defaults, so this is the whole set.
+rules:
+  - { breaking: true, release: major }
+  - { type: feat, release: minor }
+  - { type: fix, release: patch }
+  - { type: perf, release: patch }
+  - { type: revert, release: patch }
+
 deliverability:
   non_release_paths:
     - CHANGELOG.md

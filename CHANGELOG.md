@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.14.0](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.9...v1.14.0) (2026-10-14)
+
+### :sparkles: Features
+
+* **release:** renumber instead of failing when a sibling pipeline took the tag ([76c776b](https://git.ole-hartwig.eu/yasrt/cli/commit/76c776bcd41e2388a762e2f797dbd8ae07221737))
+
+### :repeat: Continuous Integrations
+
+* **release:** stop releasing on chore commits ([4b05cc8](https://git.ole-hartwig.eu/yasrt/cli/commit/4b05cc87fe6f102f0057d34c28785586d48fbee7))
+
 ## [1.13.9](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.8...v1.13.9) (2026-10-12)
 
 ### :bug: Fixes

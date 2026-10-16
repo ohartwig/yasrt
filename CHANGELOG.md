@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.14.1](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.14.0...v1.14.1) (2026-10-16)
+
+### :bug: Fixes
+
+* **contrib:** speak https and nothing else, instead of muting the rule ([5a3825a](https://git.ole-hartwig.eu/yasrt/cli/commit/5a3825afe1a445dce8be86289d45953ca7f1e9c7))
+* **contrib:** put the semgrep exception on the call it flags ([e2a94de](https://git.ole-hartwig.eu/yasrt/cli/commit/e2a94de74afa2e0c0beaad19651bacc6528923e1))
+* **contrib:** send the rollback's API calls over https only ([ebead12](https://git.ole-hartwig.eu/yasrt/cli/commit/ebead1279056acc7a9f2de1f2da273aa891e7b0d))
+* **release:** say whose tag it is when the race is lost ([c89fe6e](https://git.ole-hartwig.eu/yasrt/cli/commit/c89fe6ee4d80d48f64f43eb7f9b628b29602c655))
+
+### :repeat: Continuous Integrations
+
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 659c3a1 ([b58dcc4](https://git.ole-hartwig.eu/yasrt/cli/commit/b58dcc4a0f782ce7b842739a8bc057405074f7c2))
+
+### :repeat: Chores
+
+* **repo-templates:** sync ([720f143](https://git.ole-hartwig.eu/yasrt/cli/commit/720f143a8f39f4377c170d8b2dadca73e60d2e8e))
+
 ## [1.14.0](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.13.9...v1.14.0) (2026-10-14)
 
 ### :sparkles: Features

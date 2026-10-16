@@ -40,8 +40,15 @@ import urllib.request
 
 
 def request(method, url, token):
-    """One GitLab API call. DELETE answers nothing; the rest answer JSON."""
-    req = urllib.request.Request(url, headers={"PRIVATE-TOKEN": token}, method=method)
+    """One GitLab API call. DELETE answers nothing; the rest answer JSON.
+
+    Only https URLs are sent: urllib would also open file:// and the URL is
+    assembled from CI variables, so the scheme is checked here rather than
+    trusted.
+    """
+    if urllib.parse.urlsplit(url).scheme != "https":
+        raise ValueError(f"refusing a non-https URL: {url}")
+    req = urllib.request.Request(url, headers={"PRIVATE-TOKEN": token}, method=method)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
     with urllib.request.urlopen(req, timeout=60) as r:
         return None if method == "DELETE" else json.load(r)
 

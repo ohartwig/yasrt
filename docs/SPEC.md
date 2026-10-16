@@ -595,7 +595,8 @@ Output in the job log: "would release 3.4.0 (minor)" / "not deliverable: only do
 ## 10. Observability
 
 - Structured logs (JSON with `--log-format json`, otherwise human-readable), log level `--verbose`.
-- `next --json` and `release --json` emit machine-readable summaries; `release` additionally writes `release-report.json` (version, tag SHA, release URL, trigger results) as a job artifact.
+- `next --json` and `release --json` emit machine-readable summaries; `release` additionally writes `release-report.json` (version, tag, tag SHA, release URL, the steps with their status, trigger results) as a job artifact — on failure too, as far as the run got.
+- A job that withdraws a release when a later publish step fails reads that report and acts only on a release this run cut: the `steps` entry `tag` has status `done`, `lost_to` is absent, and the remote tag still points at `tag_sha`. A run that stopped with exit `5` records the sibling's commit in `lost_to` and a failed `tag` step; its tag is the sibling's and is never withdrawn (the losing pipeline's rollback deleted the winner's tag on 2026-10-16, release-tools before 2.6.17).
 - Secrets (`CI_JOB_TOKEN`, GPG material) are never logged; git URLs with credentials are masked.
 
 ## 11. Security and supply chain

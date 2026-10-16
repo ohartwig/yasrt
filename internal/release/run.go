@@ -100,6 +100,12 @@ type Report struct {
 	// Skipped says why nothing was released although the run succeeded: the
 	// tag was taken by a sibling pipeline and, renumbered, nothing was left.
 	Skipped string `json:"skipped,omitzero"`
+	// LostTo is the commit that holds Tag when this run failed with
+	// ErrTagMismatch: a sibling pipeline cut the same number first. The tag
+	// is that pipeline's, not ours -- a job that withdraws a release on
+	// failure must leave it alone (release-tools, 2026-10-16: the losing
+	// pipeline's rollback deleted the winner's tag).
+	LostTo string `json:"lost_to,omitzero"`
 }
 
 // Options configure a release run.
@@ -201,6 +207,17 @@ func Run(ctx context.Context, o Options) (*Report, error) {
 	return rep, err
 }
 
+// lostTo records that the tag belongs to another commit and returns the
+// ErrTagMismatch to stop on. The report then says so twice: in LostTo and as
+// a failed "tag" step, so that no reader mistakes the sibling's tag for ours.
+func (r *Report) lostTo(tag, remoteSHA, want, suffix string) error {
+	r.LostTo = remoteSHA
+	r.Steps = append(r.Steps, Step{Name: "tag", Status: StepFailed,
+		Detail: fmt.Sprintf("%s exists at %s, not at %s: cut by a sibling pipeline, left alone", tag, short(remoteSHA), short(want))})
+	return fmt.Errorf("%w: %s points at %s, not at %s%s",
+		ErrTagMismatch, tag, short(remoteSHA), short(want), suffix)
+}
+
 // failedStep names the last step that failed, for the on_failure hooks.
 func (r *Report) failedStep() string {
 	for i := len(r.Steps) - 1; i >= 0; i-- {
@@ -233,8 +250,7 @@ func run(ctx context.Context, o *Options, log *slog.Logger) (*Report, error) {
 	}
 	if tagOnRemote && remoteSHA != res.Commit {
 		if o.OnTagConflict != TagConflictRenumber {
-			return rep, fmt.Errorf("%w: %s points at %s, not at %s",
-				ErrTagMismatch, res.Tag, short(remoteSHA), short(res.Commit))
+			return rep, rep.lostTo(res.Tag, remoteSHA, res.Commit, "")
 		}
 		// A sibling pipeline released first. The number is gone; the commits
 		// are not. Ask the analysis again with the remote's tags in view and
@@ -262,8 +278,7 @@ func run(ctx context.Context, o *Options, log *slog.Logger) (*Report, error) {
 			return rep, err
 		}
 		if tagOnRemote && remoteSHA != res.Commit {
-			return rep, fmt.Errorf("%w: %s points at %s, not at %s (after renumbering)",
-				ErrTagMismatch, res.Tag, short(remoteSHA), short(res.Commit))
+			return rep, rep.lostTo(res.Tag, remoteSHA, res.Commit, " (after renumbering)")
 		}
 	}
 

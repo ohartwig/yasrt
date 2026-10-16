@@ -13,6 +13,7 @@ lives outside, as a script a pipeline runs after `release`.
 | Script | What it does | Needs |
 |---|---|---|
 | `gitlab-release-comments.py` | Notes on every merge request of a release (":tada: This MR is included in version x.y.z") and on every issue those close or the commits name (":tada: This issue has been resolved in version x.y.z") -- what semantic-release/gitlab's `success` step did. Closing stays GitLab's job at merge time | python3, a token that may write notes (`GITLAB_TOKEN`) |
+| `gitlab-release-rollback.py` | Takes a release back after a publish job failed -- the GitLab release and the tag -- and only the release this run cut: the report's `tag` step is `done`, `lost_to` is absent, and the remote tag still points at `tag_sha`. What release-tools' `release:rollback` runs; a copy of this file | python3, a token that may delete tags (`tag-pipeline-token-var`) |
 
 ## Why a script and not a feature
 

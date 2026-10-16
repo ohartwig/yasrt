@@ -278,3 +278,14 @@ release:
     - apk add --no-cache git
     - go build -o /tmp/yasrt ./cmd/yasrt
     - /tmp/yasrt release
+
+# The contrib scripts are the source of truth for what release-tools embeds
+# verbatim (release:comments, release:rollback); their tests live next to
+# them and run here, with no Go involved.
+test:contrib:
+  stage: test
+  # pinup: datasource=docker depName=registry.ole-hartwig.eu/devops/images/python
+  image: registry.ole-hartwig.eu/devops/images/python:3.14@sha256:5ffb6bd23de8808ac653918ca26c9931e6f430b16c2b66b488e1b034c2406659
+  needs: []
+  script:
+    - python3 -m unittest discover -s contrib -v

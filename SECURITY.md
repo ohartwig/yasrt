@@ -95,7 +95,8 @@ Out of scope:
 
 In addition to this human-readable policy, Kai Ole Hartwig publishes
 machine-readable security advisories per **BSI TR-03191 / OASIS CSAF 2.0**
-under <https://ole-hartwig.eu/.well-known/csaf/>:
+under `https://ole-hartwig.eu/.well-known/csaf/` (a path prefix, not a page —
+the directory itself serves no index):
 
 - **Provider metadata**: <https://ole-hartwig.eu/.well-known/csaf/provider-metadata.json>
 - **Signing key**: <https://ole-hartwig.eu/.well-known/csaf/openpgp-key.asc>

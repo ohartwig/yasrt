@@ -302,9 +302,23 @@ func TestRefusesWhenTagExistsElsewhere(t *testing.T) {
 	s.tr.Git("push", "-q", "origin", "1.1.0")
 	s.tr.Git("tag", "-d", "1.1.0")
 
-	_, err := release.Run(context.Background(), s.opts())
+	rep, err := release.Run(context.Background(), s.opts())
 	if !errors.Is(err, release.ErrTagMismatch) {
 		t.Fatalf("err = %v", err)
+	}
+	// The report must say whose tag it is: a rollback that reads the report
+	// after this failure must not delete the sibling's release.
+	sibling := s.tr.Git("rev-parse", "HEAD~1")
+	if rep.LostTo != strings.TrimSpace(sibling) {
+		t.Errorf("LostTo = %q, want %q", rep.LostTo, sibling)
+	}
+	for _, st := range rep.Steps {
+		if st.Name == "tag" && st.Status == release.StepDone {
+			t.Errorf("report claims the tag step was done: %+v", st)
+		}
+	}
+	if fs := rep.Steps[len(rep.Steps)-1]; fs.Name != "tag" || fs.Status != release.StepFailed {
+		t.Errorf("last step = %+v, want a failed tag step", fs)
 	}
 }
 

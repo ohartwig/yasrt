@@ -48,8 +48,8 @@ def request(method, url, token):
     """
     if urllib.parse.urlsplit(url).scheme != "https":
         raise ValueError(f"refusing a non-https URL: {url}")
-    req = urllib.request.Request(url, headers={"PRIVATE-TOKEN": token}, method=method)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
-    with urllib.request.urlopen(req, timeout=60) as r:
+    req = urllib.request.Request(url, headers={"PRIVATE-TOKEN": token}, method=method)
+    with urllib.request.urlopen(req, timeout=60) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
         return None if method == "DELETE" else json.load(r)
 
 

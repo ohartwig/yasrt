@@ -39,17 +39,39 @@ import urllib.parse
 import urllib.request
 
 
+def _https_only():
+    """An opener that speaks https and nothing else.
+
+    `urlopen` uses the default opener, which also handles file:// and
+    http://, and the URL is assembled from CI variables. Building the
+    director by hand instead of with `build_opener` is the point: that
+    helper keeps the default handlers and merely adds to them, so the
+    file handler would survive. Here nothing is registered for any other
+    scheme, which is why the check in `request` is a readable
+    precondition rather than the only thing standing in the way.
+    """
+    opener = urllib.request.OpenerDirector()
+    opener.add_handler(urllib.request.HTTPSHandler())
+    opener.add_handler(urllib.request.HTTPDefaultErrorHandler())
+    opener.add_handler(urllib.request.HTTPErrorProcessor())
+    opener.add_handler(urllib.request.HTTPRedirectHandler())
+    # Without this, an unsupported scheme makes `open` fall off the end of
+    # the handler chain and answer None, which the caller would meet as an
+    # AttributeError. UnknownHandler says what happened instead.
+    opener.add_handler(urllib.request.UnknownHandler())
+    return opener
+
+
 def request(method, url, token):
     """One GitLab API call. DELETE answers nothing; the rest answer JSON.
 
-    Only https URLs are sent: urllib would also open file:// and the URL is
-    assembled from CI variables, so the scheme is checked here rather than
-    trusted.
+    Only https is possible: the opener registers no other scheme, and the
+    check below says so where a reader looks first.
     """
     if urllib.parse.urlsplit(url).scheme != "https":
         raise ValueError(f"refusing a non-https URL: {url}")
     req = urllib.request.Request(url, headers={"PRIVATE-TOKEN": token}, method=method)
-    with urllib.request.urlopen(req, timeout=60) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+    with _https_only().open(req, timeout=60) as r:
         return None if method == "DELETE" else json.load(r)
 
 

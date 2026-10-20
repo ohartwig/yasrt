@@ -17,7 +17,7 @@ variables:
   # (pinup/runner!40). The tag on a variable of its own: the annotation
   # manager reads a quoted version, not an image reference.
   # pinup: datasource=docker depName=registry.ole-hartwig.eu/devops/images/golang
-  GOLANG_IMAGE_TAG: "1.27.2"
+  GOLANG_IMAGE_TAG: "1.27.3"
   GO_IMAGE: "registry.ole-hartwig.eu/devops/images/golang:$GOLANG_IMAGE_TAG"
   GOTOOLCHAIN: local
   GOFLAGS: -mod=readonly

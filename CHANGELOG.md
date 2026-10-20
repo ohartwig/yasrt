@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.14.2](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.14.1...v1.14.2) (2026-10-20)
+
+### :bug: Fixes
+
+* **deps:** update dependency registry.ole-hartwig.eu/devops/images/golang to v1.27.3 ([4b5957f](https://git.ole-hartwig.eu/yasrt/cli/commit/4b5957ff083bf33f3d4df4fc58fa9ae632c591c0))
+
+### :repeat: Continuous Integrations
+
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to ff2ddea ([a32d5a9](https://git.ole-hartwig.eu/yasrt/cli/commit/a32d5a94652ea7f3278833b64f505cca25ad3c70))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 4393934 ([cf2b041](https://git.ole-hartwig.eu/yasrt/cli/commit/cf2b0411a071d0f7254857aff73423e712069681))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 3267ade ([77c70df](https://git.ole-hartwig.eu/yasrt/cli/commit/77c70df089bb5f6c209a47c6f11b0c29e960ff27))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to b4fc592 ([b6916aa](https://git.ole-hartwig.eu/yasrt/cli/commit/b6916aa138caeb105ed645b4f8797251dbf9dc1c))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to a7e960e ([273cabe](https://git.ole-hartwig.eu/yasrt/cli/commit/273cabeee766569396d3b5785a579a7eeb6a1923))
+
 ## [1.14.1](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.14.0...v1.14.1) (2026-10-16)
 
 ### :bug: Fixes

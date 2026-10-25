@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.14.3](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.14.2...v1.14.3) (2026-10-25)
+
+### :bug: Fixes
+
+* **deps:** update module github.com/bmatcuk/doublestar/v4 to v4.10.4 ([8391bd2](https://git.ole-hartwig.eu/yasrt/cli/commit/8391bd2de0ec9ce5fa1de3415baa1f8a66e70cda))
+
+### :repeat: Continuous Integrations
+
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to a35b04d ([e784960](https://git.ole-hartwig.eu/yasrt/cli/commit/e78496016a2a5c63077f9dac05b40d66ac92c25f))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 8ceabc5 ([0965efa](https://git.ole-hartwig.eu/yasrt/cli/commit/0965efa1d3e3d17bc3e28f1b1684263ae210e0ce))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to a5ff437 ([40f4dac](https://git.ole-hartwig.eu/yasrt/cli/commit/40f4dac81d2c0c1c64c61106b95b89dd88e1bad2))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to cd27a93 ([6a551e5](https://git.ole-hartwig.eu/yasrt/cli/commit/6a551e59a06edaec4e30ba8d0f469cad63229557))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 68ef577 ([7107c4b](https://git.ole-hartwig.eu/yasrt/cli/commit/7107c4b6cc24edc7538a56f1f698b90cbe6626b1))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to d34ad71 ([5bed12d](https://git.ole-hartwig.eu/yasrt/cli/commit/5bed12d259141afdb0aa274bd65b96fcf5f09f4a))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to c010b82 ([4d34e7a](https://git.ole-hartwig.eu/yasrt/cli/commit/4d34e7a6defbeb0e96bfa9ad1a96ba8626d4cff0))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 33c75a8 ([3eaf258](https://git.ole-hartwig.eu/yasrt/cli/commit/3eaf2586b4e24b3f3bef0b498a0145fd701980cd))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 0665633 ([4f53a57](https://git.ole-hartwig.eu/yasrt/cli/commit/4f53a5700dbfdba87cec6cdb649aa4d9a37f13c8))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 89a44e4 ([34901d9](https://git.ole-hartwig.eu/yasrt/cli/commit/34901d948b64c8f7f4eaa35cadf04bb4e06716e3))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to ac72610 ([4d14c3f](https://git.ole-hartwig.eu/yasrt/cli/commit/4d14c3f10b319c6d6a50e656ae63acf148a25e26))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 76b2fe8 ([57b3a33](https://git.ole-hartwig.eu/yasrt/cli/commit/57b3a33cd6f7cd679fcf3999f46857f4332fb564))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 6fe4e46 ([963299c](https://git.ole-hartwig.eu/yasrt/cli/commit/963299c0e1dea3e2861ccddcf8997c1a50d99f42))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to bbed02a ([7cbee68](https://git.ole-hartwig.eu/yasrt/cli/commit/7cbee682264249130d6531b334c5a9659a76d638))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 07b365a ([bb592c9](https://git.ole-hartwig.eu/yasrt/cli/commit/bb592c935502e4c5d91d186f8218a98a235f41e1))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 90e53a1 ([1e6f37a](https://git.ole-hartwig.eu/yasrt/cli/commit/1e6f37a9ad8e58d29ca77e4c2b9832ed132197e5))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 65eb807 ([037ac2a](https://git.ole-hartwig.eu/yasrt/cli/commit/037ac2aac6c04fb5ee3901da7e468d053adc4215))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 8849565 ([249f09f](https://git.ole-hartwig.eu/yasrt/cli/commit/249f09f89a2a594a850f6ff5baab894b4656f792))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 8f67599 ([b9ca735](https://git.ole-hartwig.eu/yasrt/cli/commit/b9ca735475d0421f5e33d01cd6f1b28a0f617bae))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 969b8cc ([b3d0700](https://git.ole-hartwig.eu/yasrt/cli/commit/b3d0700dbbe81d2ded99bce51844fb2a9deb0b8c))
+
+### :repeat: Chores
+
+* **deps:** update dependency davidanson/markdownlint-cli2 to v0.24.0 ([83cc823](https://git.ole-hartwig.eu/yasrt/cli/commit/83cc823907ccc8d8fd16ae0d123175636c5898e2))
+
 ## [1.14.2](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.14.1...v1.14.2) (2026-10-20)
 
 ### :bug: Fixes

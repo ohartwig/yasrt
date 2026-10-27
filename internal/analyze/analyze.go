@@ -145,10 +145,11 @@ func Run(repo *git.Repo, cfg *config.Config, opts Options, log *slog.Logger) (*R
 		return nil, err
 	}
 	res.Warnings = base.Warnings
-	cut, err := highestCut(repo, cfg, ref)
+	cut, cutWarnings, err := highestCut(repo, cfg, ref)
 	if err != nil {
 		return nil, err
 	}
+	res.Warnings = append(res.Warnings, cutWarnings...)
 
 	res.Branch = resolveBranch(repo, opts.Branch)
 	preID, isPrerelease := cfg.PrereleaseFor(res.Branch)
@@ -481,26 +482,108 @@ func (c cutRelease) restrictTo(r config.Range) cutRelease {
 // highestCut reads the release commits of this configuration's message out
 // of the history. Without a release commit (release_commit disabled) there is
 // nothing to read, and the tags stay the only record.
-func highestCut(repo *git.Repo, cfg *config.Config, ref string) (cutRelease, error) {
+//
+// A subject is free text anyone whose commit is merged can write, so a
+// release commit without a tag counts only when it can be tied to a release
+// this tool cut (AUD-030-F01): its author is release_commit.author, and its
+// version is one bump step above a tagged version or an earlier accepted cut
+// - which is all a withdrawn release can ever be - or, with nothing tagged
+// below it, the configured initial version. Anything else is ignored with a
+// warning naming the subject; otherwise `chore(release): 9.0.0` from any
+// author would set the floor of every later release. The author is not
+// authenticated while release commits are unsigned, so the version step
+// carries the weight.
+func highestCut(repo *git.Repo, cfg *config.Config, ref string) (cutRelease, []string, error) {
 	var best cutRelease
 	if !cfg.ReleaseCommitEnabled() {
-		return best, nil
+		return best, nil, nil
 	}
 	subjects, err := repo.Subjects(ref)
 	if err != nil {
-		return best, err
+		return best, nil, err
 	}
+	var candidates []cutRelease
+	authors := map[string]string{}
 	for _, s := range subjects {
 		v, ok := cfg.VersionFromReleaseSubject(s.Text)
 		if !ok || v.Pre != "" {
 			continue
 		}
-		if !best.ok || best.version.Less(v) {
-			best = cutRelease{version: v, subject: s.Text, sha: s.SHA, ok: true}
+		candidates = append(candidates, cutRelease{version: v, subject: s.Text, sha: s.SHA, ok: true})
+		authors[s.SHA] = s.AuthorEmail
+	}
+	if len(candidates) == 0 {
+		return best, nil, nil
+	}
+
+	tagged, err := taggedStable(repo, cfg)
+	if err != nil {
+		return best, nil, err
+	}
+	known := slices.Clone(tagged)
+	initial, initialErr := semver.Parse(cfg.Versioning.Initial)
+	releaseEmail := cfg.ReleaseAuthorEmail()
+	var warnings []string
+	slices.SortStableFunc(candidates, func(a, b cutRelease) int { return a.version.Compare(b.version) })
+	for _, c := range candidates {
+		isTagged := slices.ContainsFunc(tagged, func(t semver.Version) bool { return t.Compare(c.version) == 0 })
+		if !isTagged {
+			switch {
+			case !strings.EqualFold(authors[c.sha], releaseEmail):
+				warnings = append(warnings, fmt.Sprintf(
+					"release commit %s %q has no tag and was not authored by the release identity <%s> but by <%s>: ignored, it does not move the version line",
+					short(c.sha), c.subject, releaseEmail, authors[c.sha]))
+				continue
+			case !oneStepAbove(c.version, known, cfg.MajorOnZero()) && (initialErr != nil || c.version.Compare(initial) != 0 || anyBelow(known, c.version)):
+				warnings = append(warnings, fmt.Sprintf(
+					"release commit %s %q has no tag and %s is not one release step above a tagged version: ignored, it does not move the version line",
+					short(c.sha), c.subject, c.version))
+				continue
+			}
+			known = append(known, c.version)
+		}
+		if !best.ok || best.version.Less(c.version) {
+			best = c
 		}
 	}
-	return best, nil
+	return best, warnings, nil
 }
+
+// taggedStable lists the stable versions of every tag in this
+// configuration's formats.
+func taggedStable(repo *git.Repo, cfg *config.Config) ([]semver.Version, error) {
+	tags, err := repo.AllTags()
+	if err != nil {
+		return nil, err
+	}
+	var out []semver.Version
+	for _, t := range tags {
+		if v, ok := cfg.VersionFromTag(t); ok && v.Pre == "" {
+			out = append(out, v)
+		}
+	}
+	return out, nil
+}
+
+// oneStepAbove reports whether v is a patch, minor or major bump of one of
+// the known versions.
+func oneStepAbove(v semver.Version, known []semver.Version, majorOnZero bool) bool {
+	return slices.ContainsFunc(known, func(k semver.Version) bool {
+		for _, b := range []semver.Bump{semver.Patch, semver.Minor, semver.Major} {
+			if k.Next(b, majorOnZero).Compare(v) == 0 {
+				return true
+			}
+		}
+		return false
+	})
+}
+
+// anyBelow reports whether a known version is lower than v.
+func anyBelow(known []semver.Version, v semver.Version) bool {
+	return slices.ContainsFunc(known, func(k semver.Version) bool { return k.Less(v) })
+}
+
+func short(sha string) string { return sha[:min(len(sha), 8)] }
 
 // nextPrerelease turns a core version into the next counter for an identifier:
 // 2.5.0 with rc becomes 2.5.0-rc.1, or rc.4 when rc.3 already exists.

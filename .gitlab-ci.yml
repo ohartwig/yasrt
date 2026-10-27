@@ -18,6 +18,15 @@ variables:
   # manager reads a quoted version, not an image reference.
   # pinup: datasource=docker depName=registry.ole-hartwig.eu/devops/images/golang
   GOLANG_IMAGE_TAG: "1.27.3"
+  # The two Go tools the pipeline runs with `go run`, pinned rather than
+  # tracking "latest" (AUD-030-F05): that executes whatever the proxy serves at job
+  # time, with the job's token, in the pipeline that builds the release tool
+  # of the estate. The checksum database proves the module is the published
+  # one, not that it is the reviewed one. pinup proposes the bumps.
+  # pinup: datasource=go depName=github.com/golangci/golangci-lint/v2
+  GOLANGCI_LINT_VERSION: "v2.15.0"
+  # pinup: datasource=go depName=golang.org/x/vuln
+  GOVULNCHECK_VERSION: "v1.9.0"
   GO_IMAGE: "registry.ole-hartwig.eu/devops/images/golang:$GOLANG_IMAGE_TAG"
   GOTOOLCHAIN: local
   GOFLAGS: -mod=readonly
@@ -146,13 +155,11 @@ include:
 lint:golangci:
   <<: *go-base
   stage: test
-  # Pinned v2.6.2 could not read Go 1.27 export data ("export data version 4 is
-  # greater than maximum supported version 2") and reported the whole standard
-  # library as unimportable. Tracking latest until a release is known to
-  # understand 1.27; advisory either way, which is why it may fail.
+  # v2.6.2 could not read Go 1.27 export data ("export data version 4 is
+  # greater than maximum supported version 2"); v2.15.0 can, and finds
+  # nothing, so the job is blocking again.
   script:
-    - go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest run --timeout 5m
-  allow_failure: true
+    - go run "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}" run --timeout 5m
 
 # The estate's stated gate is 75 % line coverage (engineering/quality-gates.md).
 # It is expressed there for PHP via Cobertura; Go reports through GitLab's
@@ -183,7 +190,7 @@ test:govulncheck:
   # same reason by devops/images/code-signing and deploy-opkssh.
   tags: [az1a]
   script:
-    - go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+    - go run "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}" ./...
 
 # The shared Go component cannot know that this repository's tests need git;
 # its own before_script only changes directory, so both have to be restated.
@@ -213,12 +220,26 @@ build:binaries:
     # linux for the runners, darwin for the developer who runs `yasrt next`
     # by hand. Windows is not built: untested, and the hook runner assumes a
     # POSIX shell.
+    #
+    # Built in a clean worktree of this commit: the checkout carries the
+    # other jobs' artefacts and the module cache as untracked files, and Go
+    # stamped every binary `+dirty` (AUD-030-F06), which is the first thing a
+    # consumer checking provenance with `go version -m` sees.
+    - src="$(mktemp -d)/src"
+    - git worktree add --detach "$src" "$CI_COMMIT_SHA"
     - |
       for target in linux/amd64 linux/arm64 darwin/arm64 darwin/amd64; do
-        CGO_ENABLED=0 GOOS="${target%/*}" GOARCH="${target#*/}" \
+        (cd "$src" && CGO_ENABLED=0 GOOS="${target%/*}" GOARCH="${target#*/}" \
           go build -trimpath -ldflags "-s -w -X main.version=${RELEASE_VERSION}" \
-          -o "dist/yasrt-${target%/*}-${target#*/}" ./cmd/yasrt
+          -o "$CI_PROJECT_DIR/dist/yasrt-${target%/*}-${target#*/}" ./cmd/yasrt)
       done
+    - git worktree remove --force "$src"
+    - |
+      if go version -m dist/yasrt-linux-amd64 | grep -q '+dirty'; then
+        go version -m dist/yasrt-linux-amd64 | head -3
+        echo "the binary was built from a modified tree" >&2
+        exit 1
+      fi
     - cd dist && sha256sum yasrt-* > SHA256SUMS && cat SHA256SUMS
   artifacts:
     paths: [dist/]

@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -241,8 +242,55 @@ func TestHookOutputIsMasked(t *testing.T) {
 	run := script(t, dir, "leak.sh", "#!/bin/sh\necho \"token=$LEAKY\"\nexit 1\n")
 	t.Setenv("LEAKY", "s3cret")
 	mask := func(s string) string { return strings.ReplaceAll(s, "s3cret", "***") }
-	res, _ := hooks.Run(context.Background(), dir, hooks.AfterRelease, []hooks.Hook{{Run: run}}, ctxFor(), mask, discard)
+	// Named in env: the hook gets it, and its output is still masked.
+	res, _ := hooks.Run(context.Background(), dir, hooks.AfterRelease, []hooks.Hook{{Run: run, Env: []string{"LEAKY"}}}, ctxFor(), mask, discard)
 	if len(res) != 1 || strings.Contains(res[0].Output, "s3cret") || !strings.Contains(res[0].Output, "***") {
 		t.Errorf("output = %+v", res)
+	}
+}
+
+// AUD-030-F02: a hook sees identifiers, not the job's credentials.
+func TestEnvironmentWithholdsCredentials(t *testing.T) {
+	environ := []string{
+		"PATH=/usr/bin", "HOME=/root", "CI_PROJECT_ID=831", "CI_COMMIT_AUTHOR=A <a@x>",
+		"HTTPS_PROXY=http://proxy:3128", "LC_ALL=C",
+		"CI_JOB_TOKEN=glcbt-abcdef", "CI_REGISTRY_PASSWORD=p", "CI_JOB_JWT_V2=jwt",
+		"GITLAB_TOKEN=glpat-x", "GITHUB_MIRROR_TOKEN=ghp", "PINUP_TRIGGER_TOKEN=t",
+		"COSIGN_PRIVATE_KEY=k", "COSIGN_PASSWORD=p", "GPG_SEM_REL_B64=LS0tLS1CRUdJTiBrZXk=",
+		"CI_REPOSITORY_URL=https://gitlab-ci-token:glcbt-abcdef@gitlab/x.git",
+		"CI_SOME_URL=https://x/?t=glcbt-abcdef", "UNRELATED=1",
+	}
+	mask := func(s string) string { return strings.ReplaceAll(s, "glcbt-abcdef", "***") }
+	got := hooks.Environment(environ, []string{"PINUP_TRIGGER_TOKEN"}, mask)
+	for _, want := range []string{"PATH=/usr/bin", "HOME=/root", "CI_PROJECT_ID=831", "CI_COMMIT_AUTHOR=A <a@x>", "HTTPS_PROXY=http://proxy:3128", "LC_ALL=C", "PINUP_TRIGGER_TOKEN=t"} {
+		if !slices.Contains(got, want) {
+			t.Errorf("hook env lacks %s", want)
+		}
+	}
+	for _, kv := range got {
+		name, _, _ := strings.Cut(kv, "=")
+		switch name {
+		case "PATH", "HOME", "CI_PROJECT_ID", "CI_COMMIT_AUTHOR", "HTTPS_PROXY", "LC_ALL", "PINUP_TRIGGER_TOKEN":
+		default:
+			t.Errorf("hook env carries %s", kv)
+		}
+	}
+}
+
+func TestHookDoesNotSeeTheJobToken(t *testing.T) {
+	dir := t.TempDir()
+	run := script(t, dir, "env.sh", "env")
+	t.Setenv("CI_JOB_TOKEN", "glcbt-canary")
+	t.Setenv("GPG_SEM_REL_B64", "a2V5LWNhbmFyeQ==")
+	t.Setenv("CI_PROJECT_PATH", "yasrt/cli")
+	res, err := hooks.Run(context.Background(), dir, hooks.BeforeTag, []hooks.Hook{{Run: run}}, ctxFor(), nil, discard)
+	if err != nil || len(res) != 1 {
+		t.Fatalf("res %+v, %v", res, err)
+	}
+	if strings.Contains(res[0].Output, "glcbt-canary") || strings.Contains(res[0].Output, "GPG_SEM_REL_B64") {
+		t.Errorf("hook saw a credential:\n%s", res[0].Output)
+	}
+	if !strings.Contains(res[0].Output, "CI_PROJECT_PATH=yasrt/cli") || !strings.Contains(res[0].Output, "RELEASE_VERSION=") {
+		t.Errorf("hook lacks identifiers or the handshake:\n%s", res[0].Output)
 	}
 }

@@ -13,6 +13,13 @@
 //
 // A hook receives the release context as JSON on stdin and as RELEASE_*
 // environment variables, and signals failure with a non-zero exit code.
+//
+// A hook does not inherit the job's credentials. Its environment is curated
+// (see Environment): identifiers such as PATH, HOME and CI_*, the proxy and
+// certificate settings, and the handshake — never a variable whose name
+// says it holds a credential, nor one whose value contains a secret the
+// release registered. A hook that needs a token names it in `env`, and gets
+// exactly that.
 package hooks
 
 import (
@@ -24,6 +31,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
 )
@@ -71,6 +79,9 @@ type Hook struct {
 	// AllowFailure overrides the per-event default: after_release tolerates
 	// failure, every earlier event does not.
 	AllowFailure *bool `yaml:"allow_failure"`
+	// Env names job variables passed to this hook as they are, credentials
+	// included: the explicit opt-in for a hook that needs a token.
+	Env []string `yaml:"env"`
 }
 
 func (h Hook) label() string {
@@ -102,8 +113,8 @@ func (h Hook) fatal(e Event) bool {
 	return e != AfterRelease && e != AfterAnalysis && e != OnFailure
 }
 
-// Context is what a hook is told. It carries no credentials: a hook that needs
-// a token reads it from its own environment, so yasrt never hands one out.
+// Context is what a hook is told. It carries no credentials, and neither does
+// the hook's environment unless the hook names a variable in Hook.Env.
 type Context struct {
 	Event      string   `json:"event"`
 	Status     string   `json:"status"`
@@ -136,10 +147,10 @@ type Result struct {
 // ErrHookFailed marks a failure that must stop the release.
 var ErrHookFailed = errors.New("hook failed")
 
-// Masker removes secrets from text before it is recorded. Hooks inherit the
-// job's environment by design -- a hook that needs a token reads it there --
-// so anything a hook prints may contain one, and its output ends up in the
-// release report, which is a job artefact.
+// Masker removes secrets from text before it is recorded. A hook may still
+// come by one — a variable it named in Hook.Env, a file it reads — and its
+// output ends up in the release report, which is a job artefact. Environment
+// also uses it to recognise a variable whose value contains a secret.
 type Masker func(string) string
 
 // Run executes the hooks configured for one event, in order. It stops at the
@@ -185,7 +196,7 @@ func runOne(ctx context.Context, dir string, event Event, h Hook, payload []byte
 	cmd := exec.CommandContext(runCtx, h.Run, h.Args...)
 	cmd.Dir = dir
 	cmd.Stdin = bytes.NewReader(payload)
-	cmd.Env = append(os.Environ(), envFor(c)...)
+	cmd.Env = append(Environment(os.Environ(), h.Env, mask), envFor(c)...)
 
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
@@ -235,4 +246,64 @@ func envFor(c Context) []string {
 		"YASRT_ERROR=" + c.Error,
 		"YASRT_FAILED_STEP=" + c.FailedStep,
 	}
+}
+
+// passNames are passed to every hook by exact name; passPrefixes by prefix.
+// Everything else stays in the job.
+var (
+	passNames = []string{
+		"PATH", "HOME", "USER", "LOGNAME", "SHELL", "TERM", "PWD", "HOSTNAME",
+		"LANG", "LANGUAGE", "TZ", "TMPDIR",
+		"CI", "GITLAB_CI",
+		"HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
+		"SSL_CERT_FILE", "SSL_CERT_DIR",
+	}
+	passPrefixes = []string{"LC_", "CI_", "GITLAB_", "GITHUB_", "RUNNER_", "YASRT_", "RELEASE_"}
+	// credentialWords in a name keep a variable from a hook even when its
+	// prefix would pass it: CI_JOB_TOKEN, CI_REGISTRY_PASSWORD, GITLAB_TOKEN,
+	// GITHUB_TOKEN, CI_JOB_JWT and their kind.
+	credentialWords = []string{"TOKEN", "PASSWORD", "PASSWD", "SECRET", "PRIVATE", "KEY", "JWT", "CREDENTIAL", "AUTH", "COOKIE", "SESSION"}
+	// withheldNames carry a credential without saying so: the clone URL embeds
+	// the job token.
+	withheldNames = []string{"CI_REPOSITORY_URL"}
+)
+
+// Environment returns the part of environ a hook may see (AUD-030-F02):
+// the names in passNames and passPrefixes, minus any whose name contains a
+// credential word, minus any whose value the masker changes — that is, one
+// that contains a secret the release registered (the job token, the
+// signing key) — plus the variables the hook names in pass, as they are.
+// mask may be nil.
+func Environment(environ, pass []string, mask Masker) []string {
+	var out []string
+	for _, kv := range environ {
+		name, value, ok := strings.Cut(kv, "=")
+		if !ok {
+			continue
+		}
+		if slices.Contains(pass, name) {
+			out = append(out, kv)
+			continue
+		}
+		if !passes(name) {
+			continue
+		}
+		if mask != nil && mask(value) != value {
+			continue
+		}
+		out = append(out, kv)
+	}
+	return out
+}
+
+func passes(name string) bool {
+	if slices.Contains(withheldNames, name) {
+		return false
+	}
+	// AUTHOR (CI_COMMIT_AUTHOR) is an identifier, not AUTH.
+	upper := strings.ReplaceAll(strings.ToUpper(name), "AUTHOR", "")
+	if slices.ContainsFunc(credentialWords, func(w string) bool { return strings.Contains(upper, w) }) {
+		return false
+	}
+	return slices.Contains(passNames, name) || slices.ContainsFunc(passPrefixes, func(p string) bool { return strings.HasPrefix(name, p) })
 }

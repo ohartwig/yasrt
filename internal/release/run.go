@@ -106,7 +106,16 @@ type Report struct {
 	// failure must leave it alone (release-tools, 2026-10-16: the losing
 	// pipeline's rollback deleted the winner's tag).
 	LostTo string `json:"lost_to,omitzero"`
+	// TagResumed is set when the tag was already on the remote at the
+	// released commit: a previous run of this release pushed it and failed
+	// later. The tag is this release's all the same, and a withdrawal must
+	// treat it as cut by this run (AUD-030-F03).
+	TagResumed bool `json:"tag_resumed,omitzero"`
 }
+
+// TagResumedDetail is the detail of the tag step when a resumed run found
+// its tag already on the remote; the withdrawal script keys on it too.
+const TagResumedDetail = "already on the remote at this commit"
 
 // Options configure a release run.
 type Options struct {
@@ -139,9 +148,9 @@ func (o *Options) remote() string {
 	return o.Remote
 }
 
-// hookContext describes the release to an external hook. It deliberately
-// carries no credentials: a hook that needs a token reads it from its own
-// environment rather than being handed one.
+// hookContext describes the release to an external hook. It carries no
+// credentials, and the hook's environment carries none either unless the
+// hook names a variable in `env` (hooks.Environment).
 func hookContext(res *analyze.Result, notes, projectURL string, dryRun bool) hooks.Context {
 	return hooks.Context{
 		Status:     string(res.Status),
@@ -238,9 +247,6 @@ func run(ctx context.Context, o *Options, log *slog.Logger) (*Report, error) {
 	if o.Token != "" {
 		repo.AddSecret(o.Token)
 	}
-	if k := strings.TrimSpace(o.GPGKeyB64); k != "" {
-		repo.AddSecret(k)
-	}
 
 	// Idempotency anchor first: what the remote already knows about this tag
 	// decides how strict the HEAD check below may be.
@@ -308,13 +314,15 @@ func run(ctx context.Context, o *Options, log *slog.Logger) (*Report, error) {
 	}
 
 	// Signing must be decided before anything is pushed, so that `required`
-	// fails while the repository is still untouched.
-	sign, cleanupKey, err := setupSigning(repo, cfg, o.GPGKeyB64, log)
-	if err != nil {
+	// fails while the repository is still untouched. The key itself is not
+	// written yet: before_tag hooks run first, and a hook does not get to
+	// read it (AUD-030-F02).
+	if err := checkSigning(cfg, o.GPGKeyB64); err != nil {
 		return rep, err
 	}
-	defer cleanupKey()
-	rep.Signed = sign
+	registerKeySecrets(repo, o.GPGKeyB64)
+	cleanupKey := func() {}
+	defer func() { cleanupKey() }()
 
 	// An annotated tag records a tagger, so the identity has to exist before
 	// step 3, not merely before the release commit. A fresh CI container has
@@ -354,6 +362,13 @@ func run(ctx context.Context, o *Options, log *slog.Logger) (*Report, error) {
 			Detail: fmt.Sprintf("%d hook(s)", len(hres))})
 	}
 
+	sign, cleanup, err := setupSigning(repo, cfg, o.GPGKeyB64, log)
+	if err != nil {
+		return rep, err
+	}
+	cleanupKey = cleanup
+	rep.Signed = sign
+
 	if o.DryRun {
 		log.Info("dry run: stopping before the first write")
 		rep.Steps = append(rep.Steps, Step{Name: "dry-run", Status: StepSkipped, Detail: "no writes performed"})
@@ -387,7 +402,8 @@ func run(ctx context.Context, o *Options, log *slog.Logger) (*Report, error) {
 
 	// Step 3: the tag, on the commit that was built.
 	if tagOnRemote {
-		rep.Steps = append(rep.Steps, Step{Name: "tag", Status: StepSkipped, Detail: "already on the remote at this commit"})
+		rep.Steps = append(rep.Steps, Step{Name: "tag", Status: StepSkipped, Detail: TagResumedDetail})
+		rep.TagResumed = true
 		log.Info("tag already published, continuing", "tag", res.Tag)
 	} else {
 		if repo.TagExistsLocally(res.Tag) {
@@ -409,11 +425,29 @@ func run(ctx context.Context, o *Options, log *slog.Logger) (*Report, error) {
 		log.Info("tag pushed", "tag", res.Tag, "commit", short(res.Commit))
 	}
 
-	hres, hookErr = hooks.Run(ctx, repo.Dir(), hooks.AfterTag, cfg.Hooks.For(hooks.AfterTag), hctx, repo.Mask, log)
+	// after_tag hooks run between the tag and the release commit, both
+	// signed. The key is taken off disk for them and written again after
+	// (AUD-030-F02).
+	afterTag := cfg.Hooks.For(hooks.AfterTag)
+	if len(afterTag) > 0 && sign {
+		cleanupKey()
+		cleanupKey = func() {}
+	}
+	hres, hookErr = hooks.Run(ctx, repo.Dir(), hooks.AfterTag, afterTag, hctx, repo.Mask, log)
 	rep.Hooks = append(rep.Hooks, hres...)
 	if hookErr != nil {
 		rep.Steps = append(rep.Steps, Step{Name: "hook:after_tag", Status: StepFailed, Detail: hookErr.Error()})
 		return rep, hookErr
+	}
+	if len(afterTag) > 0 && sign {
+		resigned, cleanup, err := setupSigning(repo, cfg, o.GPGKeyB64, log)
+		if err != nil {
+			return rep, err
+		}
+		cleanupKey = cleanup
+		if !resigned {
+			return rep, fmt.Errorf("%w: the key could not be set up again after the after_tag hooks", ErrSigningRequired)
+		}
 	}
 	if len(hres) > 0 {
 		rep.Steps = append(rep.Steps, Step{Name: "hook:after_tag", Status: StepDone,

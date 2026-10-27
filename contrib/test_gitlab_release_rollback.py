@@ -97,5 +97,34 @@ class RollbackTests(unittest.TestCase):
         self.assertIn("by hand", out)
 
 
+    # AUD-030-F03: a resumed run found its own tag on the remote and skipped
+    # the tag step; when its publish fails, the tag is still this release's.
+    def test_withdraws_the_tag_of_a_resumed_run(self):
+        for rep in (
+            {"tag": "v1.6.6", "tag_sha": OURS, "steps": [{"name": "tag", "status": "skipped", "detail": "already on the remote at this commit"}]},
+            {"tag": "v1.6.6", "tag_sha": OURS, "tag_resumed": True, "steps": [{"name": "tag", "status": "skipped"}]},
+        ):
+            api = FakeAPI(OURS)
+            code, out = run(rep, api)
+            self.assertEqual(code, 1)
+            self.assertEqual(api.deleted, ["releases/v1.6.6", "repository/tags/v1.6.6"])
+            self.assertIn("withdrawn", out)
+
+    def test_a_resumed_run_leaves_a_moved_tag_alone(self):
+        api = FakeAPI(THEIRS)
+        rep = {"tag": "v1.6.6", "tag_sha": OURS, "tag_resumed": True, "steps": [{"name": "tag", "status": "skipped"}]}
+        code, out = run(rep, api)
+        self.assertEqual(code, 0)
+        self.assertEqual(api.deleted, [])
+        self.assertIn("leaving it alone", out)
+
+    def test_a_resumed_lost_race_is_still_not_ours(self):
+        api = FakeAPI(THEIRS)
+        rep = {"tag": "v1.6.6", "tag_sha": OURS, "tag_resumed": True, "lost_to": THEIRS, "steps": [{"name": "tag", "status": "skipped"}]}
+        code, _ = run(rep, api)
+        self.assertEqual(code, 0)
+        self.assertEqual(api.deleted, [])
+
+
 if __name__ == "__main__":
     unittest.main()

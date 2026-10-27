@@ -16,7 +16,8 @@ package manager in the release path.
   behind.
 - **No stored secrets.** The job's own token (`CI_JOB_TOKEN`, `GITHUB_TOKEN`,
   `FORGEJO_TOKEN`) is the only credential required. A signing key is optional;
-  `sign: auto` degrades to unsigned rather than failing.
+  `sign: auto` degrades to unsigned rather than failing, with a warning-level
+  log line saying so; `sign: required` fails instead.
 - **Three forges.** GitLab, GitHub and Forgejo, detected from the job
   environment.
 - **One file per repository**, almost everything derived from a single
@@ -242,9 +243,14 @@ hooks:
 | `on_failure` | when `release` is about to exit non-zero; told `error` and `failed_step` | reported |
 
 `args` are passed verbatim — no shell, so nothing is word-split or
-glob-expanded. Hooks inherit the job's environment (a hook that needs a token
-reads it there) and are never handed one in the payload; what they print is
-recorded in the run report with secrets masked.
+glob-expanded. Hooks do not inherit the job's credentials: their environment
+carries identifiers (`PATH`, `HOME`, `CI_*`, proxy and certificate settings)
+and the handshake, never a variable whose name says it holds a credential or
+whose value contains the job token or the signing key. A hook that needs a
+token names it: `env: [MY_TOKEN]` passes exactly that variable. The signing key
+is not on disk while `before_tag` and `after_tag` hooks run. What hooks print
+is recorded in the run report with secrets masked, the signing key in every
+form included.
 
 Everything else is optional and documented in
 [`schema/yasrt.schema.json`](schema/yasrt.schema.json), which editors pick up

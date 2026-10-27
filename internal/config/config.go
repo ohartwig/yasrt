@@ -627,6 +627,20 @@ func (vars Vars) Expand(tmpl string) string {
 	return strings.ReplaceAll(out, NotesPlaceholder, vars.Notes)
 }
 
+// ReleaseAuthorEmail is the email release commits are authored under:
+// release_commit.author's address, else the default author's, as the release
+// configures git's identity.
+func (c *Config) ReleaseAuthorEmail() string {
+	for _, a := range []string{c.ReleaseCommit.Author, DefaultReleaseAuthor} {
+		if _, rest, ok := strings.Cut(a, "<"); ok {
+			if email := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(rest), ">")); email != "" {
+				return email
+			}
+		}
+	}
+	return ""
+}
+
 // VersionFromReleaseSubject reads the version out of the subject of a release
 // commit this configuration writes: release_commit.message's first line with
 // ${version} or ${tag} in it. False for any other subject, and for a message

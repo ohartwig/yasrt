@@ -4,6 +4,7 @@
 package release_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json/v2"
@@ -16,6 +17,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -427,6 +429,11 @@ func TestRerunAfterFailedGitLabStep(t *testing.T) {
 	}
 	if got := stepStatus(rep, "tag"); got != release.StepSkipped {
 		t.Errorf("tag step = %q, want skipped", got)
+	}
+	// The withdrawal reads this to know the tag is still this release's
+	// (AUD-030-F03).
+	if !rep.TagResumed {
+		t.Error("a resumed run must record tag_resumed")
 	}
 	if s.gl.creates.Load() != 1 {
 		t.Errorf("creates = %d", s.gl.creates.Load())
@@ -861,5 +868,81 @@ release_commit:
 		if !strings.Contains(files, want) {
 			t.Errorf("%s missing from the release commit:\n%s", want, files)
 		}
+	}
+}
+
+// AUD-030-F02, the review's reproduction: with a signing key configured,
+// neither a before_tag nor an after_tag hook finds the key file or the key
+// variable, and a hook that prints key material prints it masked. The tag
+// and the release commit are signed all the same.
+func TestHooksCannotReachTheSigningKey(t *testing.T) {
+	if _, err := exec.LookPath("ssh-keygen"); err != nil {
+		t.Skip("ssh-keygen not available")
+	}
+	keyDir := t.TempDir()
+	priv := filepath.Join(keyDir, "id_ed25519")
+	if out, err := exec.Command("ssh-keygen", "-t", "ed25519", "-N", "", "-C", "release-bot", "-f", priv).CombinedOutput(); err != nil {
+		t.Fatalf("ssh-keygen: %v\n%s", err, out)
+	}
+	privPEM, err := os.ReadFile(priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b64 := base64.StdEncoding.EncodeToString(privPEM)
+	t.Setenv("GPG_SEM_REL_B64", b64)
+	// The hook's git must not find the developer's own signing key.
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	probe := `k=$(git config user.signingkey); if [ -n "$k" ] && [ -r "$k" ]; then echo "keyfile_readable=yes"; fi; env | grep -c GPG_SEM_REL_B64; printf '%s\n' "$1"`
+	body := strings.Split(strings.TrimSpace(string(privPEM)), "\n")[1]
+	cfgSrc := "product: image\nrelease_commit:\n  sign: required\nhooks:\n" +
+		"  before_tag:\n    - run: sh\n      args: [\"-c\", " + strconvQuote(probe) + ", \"probe\", " + strconvQuote(body) + "]\n" +
+		"  after_tag:\n    - run: sh\n      args: [\"-c\", " + strconvQuote(probe) + ", \"probe\", " + strconvQuote(body) + "]\n"
+	s := setup(t, cfgSrc)
+	o := s.opts()
+	o.GPGKeyB64 = b64
+
+	rep := run(t, o)
+	if !rep.Signed {
+		t.Fatal("the release should be signed")
+	}
+	if len(rep.Hooks) != 2 {
+		t.Fatalf("hooks = %+v", rep.Hooks)
+	}
+	for _, h := range rep.Hooks {
+		if strings.Contains(h.Output, "keyfile_readable=yes") {
+			t.Errorf("%s hook could read the key file:\n%s", h.Event, h.Output)
+		}
+		if !strings.HasPrefix(h.Output, "0") {
+			t.Errorf("%s hook saw GPG_SEM_REL_B64:\n%s", h.Event, h.Output)
+		}
+		if strings.Contains(h.Output, body) {
+			t.Errorf("%s hook output carries key material unmasked:\n%s", h.Event, h.Output)
+		}
+	}
+	if out, err := s.tr.TryGit("cat-file", "-p", "1.1.0"); err != nil || !strings.Contains(out, "-----BEGIN SSH SIGNATURE-----") {
+		t.Errorf("tag not signed: %v\n%s", err, out)
+	}
+	if out, err := s.tr.TryGit("cat-file", "-p", "HEAD"); err != nil || !strings.Contains(out, "-----BEGIN SSH SIGNATURE-----") {
+		t.Errorf("release commit not signed after the after_tag hooks: %v\n%s", err, out)
+	}
+}
+
+func strconvQuote(s string) string { return strconv.Quote(s) }
+
+// AUD-030-F04: an unsigned release under sign: auto says so at warning
+// level, not as a note nobody reads.
+func TestSignAutoWithoutKeyWarnsLoudly(t *testing.T) {
+	s := setup(t, "product: image\nrelease_commit:\n  sign: auto\n")
+	o := s.opts()
+	var buf bytes.Buffer
+	o.Log = slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	rep := run(t, o)
+	if rep.Signed {
+		t.Fatal("without a key the release is unsigned")
+	}
+	if !strings.Contains(buf.String(), "level=WARN") || !strings.Contains(buf.String(), "UNSIGNED RELEASE") {
+		t.Errorf("no warning-level line about the unsigned release:\n%s", buf.String())
 	}
 }

@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.14.4](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.14.3...v1.14.4) (2026-10-27)
+
+### :bug: Fixes
+
+* close the AUD-030 security review findings F01-F06 ([210a2f6](https://git.ole-hartwig.eu/yasrt/cli/commit/210a2f6aff8471edcf3747ce2a22329a32ce6690))
+
+### :repeat: Continuous Integrations
+
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 07a1f07 ([d0f4e41](https://git.ole-hartwig.eu/yasrt/cli/commit/d0f4e416ab3fac7f6972cd385f75e7ab8b41748c))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to e1299bd ([bf82b5f](https://git.ole-hartwig.eu/yasrt/cli/commit/bf82b5fe14bde3ef96ad7b3ac89f9f4620c2aac6))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 43c8ccb ([4b6f0fc](https://git.ole-hartwig.eu/yasrt/cli/commit/4b6f0fcac2aa5b9fec37291008493668cfd24681))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 63e0eae ([db02963](https://git.ole-hartwig.eu/yasrt/cli/commit/db029636de375601ad01b2aee7dc8f9929b66c3e))
+
 ## [1.14.3](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.14.2...v1.14.3) (2026-10-25)
 
 ### :bug: Fixes

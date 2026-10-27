@@ -75,11 +75,28 @@ def request(method, url, token):
         return None if method == "DELETE" else json.load(r)
 
 
+RESUMED_DETAIL = "already on the remote at this commit"
+
+
 def cut_by_this_run(report):
-    """True when the report says this run pushed the tag itself."""
+    """True when the tag is this release's: this run pushed it, or a previous
+    run of the same release did and this one resumed (the tag step is skipped
+    because the tag was already on the remote at the released commit).
+
+    A resumed run's publish can fail as well, and leaving its tag standing is
+    the shape GDG-44 described: a tagged version nobody can pull. Whether the
+    tag still points where this release put it is decided by the tag_sha
+    comparison in withdraw(). A lost race (lost_to) is never ours.
+    """
     if report.get("lost_to"):
         return False
-    return any(s.get("name") == "tag" and s.get("status") == "done" for s in report.get("steps", []))
+    if report.get("tag_resumed"):
+        return True
+    return any(
+        s.get("name") == "tag"
+        and (s.get("status") == "done" or (s.get("status") == "skipped" and s.get("detail") == RESUMED_DETAIL))
+        for s in report.get("steps", [])
+    )
 
 
 def withdraw(report, env, call=request):

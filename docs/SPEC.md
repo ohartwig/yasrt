@@ -310,8 +310,27 @@ context (`YASRT_ERROR`, `YASRT_FAILED_STEP` in the environment). It cannot
 rescue the release, and its own failure is logged and otherwise ignored — the
 original error is what `release` exits with.
 
-Hooks are never handed a credential. A hook that needs a token reads it from
-its own environment.
+Hooks are never handed a credential (AUD-030-F02). A hook's environment is
+curated: `PATH`, `HOME`, `USER`, `SHELL`, `TERM`, `LANG`, `TZ`, `TMPDIR`,
+`LC_*`, the proxy variables, `SSL_CERT_FILE`/`SSL_CERT_DIR`, and the
+`CI_*`, `GITLAB_*`, `GITHUB_*`, `RUNNER_*`, `YASRT_*` and `RELEASE_*`
+identifiers — minus every name containing TOKEN, PASSWORD, SECRET, PRIVATE,
+KEY, JWT, CREDENTIAL, AUTH, COOKIE or SESSION, minus `CI_REPOSITORY_URL`
+(which embeds the job token), and minus any variable whose value contains a
+secret the release registered (the job token, the signing key in its base64
+and decoded forms). A hook that needs a variable names it in `env:`, and gets
+exactly those, as they are:
+
+```yaml
+hooks:
+  after_tag:
+    - run: ./scripts/publish-composer.sh
+      env: [PACKAGIST_TOKEN]
+```
+
+The signing key is written to disk only after the `before_tag` hooks and is
+taken off disk again while the `after_tag` hooks run; `sign: required` is still
+checked before any hook runs, so a missing key fails with nothing written.
 
 ### 5.1 Derivation `product → non_release_paths` (F11)
 
@@ -353,7 +372,7 @@ Comparing `<lastTag>..HEAD` is the fix, and it is a behaviour change to be measu
 **Flow:**
 
 1. Determine last release: highest tag matching `tag_format` that is an ancestor of HEAD (`git tag --merged HEAD`). No tag ⇒ `versioning.initial` as candidate, all commits count.
-   **A version is cut once.** The highest stable version named by a release commit reachable from HEAD (the first line of `release_commit.message`, `${version}` or `${tag}` read back) is a floor as well: when it is higher than the last tag - a release whose tag was withdrawn, e.g. by the component's sweep after a failed or canceled tag pipeline - the next version is counted on from it, never re-cut or undercut, and a warning names it. The bump then comes from the commits after that release commit; when none of them releases, the withdrawn content still ships as a patch. `--version` must be higher than that floor too. With `release_commit.enabled: false` there is nothing to read and the tags alone decide.
+   **A version is cut once.** The highest stable version named by a release commit reachable from HEAD (the first line of `release_commit.message`, `${version}` or `${tag}` read back) is a floor as well — but only a release commit this tool can have cut (AUD-030-F01): one with a tag, or one authored by `release_commit.author`'s address whose version is one release step (patch, minor or major) above a tagged version or an earlier accepted cut, or, with nothing tagged below it, `versioning.initial`. A subject is free text; any other release-shaped commit is ignored with a warning naming it, so `chore(release): 9.0.0` from any author cannot set the floor of every later release. While release commits are unsigned the author is free text too, and the one-step rule carries the weight. Within those bounds: when it is higher than the last tag - a release whose tag was withdrawn, e.g. by the component's sweep after a failed or canceled tag pipeline - the next version is counted on from it, never re-cut or undercut, and a warning names it. The bump then comes from the commits after that release commit; when none of them releases, the withdrawn content still ships as a patch. `--version` must be higher than that floor too. With `release_commit.enabled: false` there is nothing to read and the tags alone decide.
 2. Read commits `lastTag..HEAD` (`git log --format=...`), parse. Ignore if scope, author or trailer matches `ignore`. Non-conforming commits count as "no release" and are not listed in the notes (but appear in the debug log).
 3. Determine bump: first matching rule per commit; highest bump across all commits. `major_on_zero: false` lowers `major` to `minor` while current < 1.0.0.
 4. Deliverability (F3): changed paths `lastTag..HEAD`; if **all** paths match `non_release_paths` ⇒ not deliverable.
@@ -450,7 +469,7 @@ Consequence for `rules:`: GitLab evaluates `rules` at pipeline creation, **befor
 | Git push (tag, release commit) | `https://gitlab-ci-token:${CI_JOB_TOKEN}@…` | project setting **Allow Git push requests to the repository** (GitLab ≥ 18.4); the triggering user may push to the default branch and protected tags |
 | Create release | Releases API, header `JOB-TOKEN` | — |
 | Follow-up trigger | Pipeline Trigger API, header `JOB-TOKEN` | target project has the source project/group on its job token allowlist |
-| Commit and tag signature | `GPG_SEM_REL_B64` (optional), **OpenPGP or OpenSSH** | the only remaining long-lived secret; `sign: auto` degrades to unsigned without a key. The format is detected from the key material, not configured |
+| Commit and tag signature | `GPG_SEM_REL_B64` (optional), **OpenPGP or OpenSSH** | the only remaining long-lived secret; `sign: auto` degrades to unsigned without a key and says so in a warning-level line (`UNSIGNED RELEASE`) and on stderr after the release. The format is detected from the key material, not configured |
 
 **No** PATs, project or group access tokens. `yasrt check` verifies the push setting by test-pushing a dummy ref (`refs/yasrt/check`, deleted immediately) and reports missing permissions before the first real release.
 
@@ -596,7 +615,7 @@ Output in the job log: "would release 3.4.0 (minor)" / "not deliverable: only do
 
 - Structured logs (JSON with `--log-format json`, otherwise human-readable), log level `--verbose`.
 - `next --json` and `release --json` emit machine-readable summaries; `release` additionally writes `release-report.json` (version, tag, tag SHA, release URL, the steps with their status, trigger results) as a job artifact — on failure too, as far as the run got.
-- A job that withdraws a release when a later publish step fails reads that report and acts only on a release this run cut: the `steps` entry `tag` has status `done`, `lost_to` is absent, and the remote tag still points at `tag_sha`. A run that stopped with exit `5` records the sibling's commit in `lost_to` and a failed `tag` step; its tag is the sibling's and is never withdrawn (the losing pipeline's rollback deleted the winner's tag on 2026-10-16, release-tools before 2.6.17).
+- A job that withdraws a release when a later publish step fails reads that report and acts only on a release this run cut: the `steps` entry `tag` has status `done` — or the run resumed a release whose earlier attempt pushed the tag (`tag_resumed: true`, the `tag` step `skipped` with "already on the remote at this commit"; AUD-030-F03) — `lost_to` is absent, and the remote tag still points at `tag_sha`. A run that stopped with exit `5` records the sibling's commit in `lost_to` and a failed `tag` step; its tag is the sibling's and is never withdrawn (the losing pipeline's rollback deleted the winner's tag on 2026-10-16, release-tools before 2.6.17).
 - Secrets (`CI_JOB_TOKEN`, GPG material) are never logged; git URLs with credentials are masked.
 
 ## 11. Security and supply chain

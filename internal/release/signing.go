@@ -35,6 +35,49 @@ const (
 	pgpKeyHeader = "-----BEGIN PGP PRIVATE KEY BLOCK-----" // nosemgrep
 )
 
+// checkSigning decides, without writing the key anywhere, whether a release
+// with sign: required can sign: a key is present, decodes, and is a format
+// yasrt knows. `auto` and `off` never fail here.
+func checkSigning(cfg *config.Config, keyB64 string) error {
+	if cfg.ReleaseCommit.Sign != config.SignRequired {
+		return nil
+	}
+	if strings.TrimSpace(keyB64) == "" {
+		return fmt.Errorf("%w: no key was provided", ErrSigningRequired)
+	}
+	key, err := decodeKey(keyB64)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrSigningRequired, err)
+	}
+	if !strings.Contains(key, sshKeyHeader) && !strings.Contains(key, pgpKeyHeader) {
+		return fmt.Errorf("%w: key is neither an OpenSSH private key nor an armoured PGP block", ErrSigningRequired)
+	}
+	return nil
+}
+
+// registerKeySecrets masks the signing key in every form it can take in
+// output: the variable as given, the decoded armour, and each line of its
+// body, so that a hook printing part of the key file prints asterisks
+// (AUD-030-F02). The armour delimiters are not secret and stay readable.
+func registerKeySecrets(repo *git.Repo, keyB64 string) {
+	k := strings.TrimSpace(keyB64)
+	if k == "" {
+		return
+	}
+	repo.AddSecret(k)
+	key, err := decodeKey(k)
+	if err != nil {
+		return
+	}
+	repo.AddSecret(strings.TrimSpace(key))
+	for line := range strings.Lines(key) {
+		line = strings.TrimSpace(line)
+		if len(line) >= 16 && !strings.HasPrefix(line, "-----") {
+			repo.AddSecret(line)
+		}
+	}
+}
+
 // setupSigning prepares the optional signing key and tells git to use it.
 // `auto` degrades to unsigned; `required` fails here, before anything is
 // written. The returned cleanup removes any key material written to disk.
@@ -66,7 +109,12 @@ func setupSigning(repo *git.Repo, cfg *config.Config, keyB64 string, log *slog.L
 		if required {
 			return false, noop, fmt.Errorf("%w: no key was provided", ErrSigningRequired)
 		}
-		log.Info("no signing key present, continuing unsigned")
+		// Loud on purpose (AUD-030-F04): the estate's default is auto, the key
+		// variable was missing everywhere, and a debug-level note let every
+		// release go out unsigned without anybody noticing.
+		log.Warn("UNSIGNED RELEASE: release_commit.sign is auto and no signing key was provided, " +
+			"so the tag and the release commit carry no signature. Provide the key, or set sign: required " +
+			"to fail without one, or sign: off to make unsigned releases an explicit decision")
 		return unsigned()
 	}
 

@@ -379,6 +379,11 @@
               "allow_failure": {
                 "type": "boolean",
                 "description": "Overrides the per-event default: fatal for before_tag and after_tag, tolerated for after_analysis and after_release."
+              },
+              "env": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+                "description": "Job variables passed to this hook as they are, credentials included. Without it a hook sees identifiers (PATH, HOME, CI_*, ...) and the handshake, never a credential."
               }
             }
           }
@@ -415,6 +420,11 @@
               "allow_failure": {
                 "type": "boolean",
                 "description": "Overrides the per-event default: fatal for before_tag and after_tag, tolerated for after_analysis and after_release."
+              },
+              "env": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+                "description": "Job variables passed to this hook as they are, credentials included. Without it a hook sees identifiers (PATH, HOME, CI_*, ...) and the handshake, never a credential."
               }
             }
           }
@@ -451,6 +461,11 @@
               "allow_failure": {
                 "type": "boolean",
                 "description": "Overrides the per-event default: fatal for before_tag and after_tag, tolerated for after_analysis and after_release."
+              },
+              "env": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+                "description": "Job variables passed to this hook as they are, credentials included. Without it a hook sees identifiers (PATH, HOME, CI_*, ...) and the handshake, never a credential."
               }
             }
           }
@@ -487,6 +502,11 @@
               "allow_failure": {
                 "type": "boolean",
                 "description": "Overrides the per-event default: fatal for before_tag and after_tag, tolerated for after_analysis and after_release."
+              },
+              "env": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+                "description": "Job variables passed to this hook as they are, credentials included. Without it a hook sees identifiers (PATH, HOME, CI_*, ...) and the handshake, never a credential."
               }
             }
           }
@@ -523,6 +543,11 @@
               "allow_failure": {
                 "type": "boolean",
                 "description": "Overrides the per-event default: fatal for before_tag and after_tag, tolerated for after_analysis and after_release."
+              },
+              "env": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+                "description": "Job variables passed to this hook as they are, credentials included. Without it a hook sees identifiers (PATH, HOME, CI_*, ...) and the handshake, never a credential."
               }
             }
           },

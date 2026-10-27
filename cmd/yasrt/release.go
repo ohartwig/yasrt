@@ -131,6 +131,9 @@ func cmdRelease(args []string) error {
 		return nil
 	}
 	fmt.Printf("released %s as %s\n", rep.Version, rep.Tag)
+	if !rep.Signed && cfg.ReleaseCommit.Sign == config.SignAuto {
+		fmt.Fprintf(os.Stderr, "warning: %s is unsigned: sign is auto and $%s held no signing key\n", rep.Tag, gpgVar)
+	}
 	if rep.ReleaseURL != "" {
 		fmt.Println(rep.ReleaseURL)
 	}

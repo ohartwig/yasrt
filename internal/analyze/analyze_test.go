@@ -694,7 +694,7 @@ func TestAWithdrawnReleaseIsNeverCutAgainOrUndercut(t *testing.T) {
 			tr.CommitFile("CHANGELOG.md", "b\n", "chore(release): 1.1.0") // its tag was taken back
 			c.then(tr)
 
-			res := run(t, tr, cfg(t, "product: image\n"), analyze.Options{})
+			res := run(t, tr, cfg(t, botAuthored), analyze.Options{})
 			if res.Status != analyze.StatusRelease || res.Version.String() != c.want {
 				t.Fatalf("status %s, version %s, want %s", res.Status, res.Version, c.want)
 			}
@@ -717,9 +717,82 @@ func TestAnExplicitVersionCannotReuseAWithdrawnOne(t *testing.T) {
 	tr.CommitFile("CHANGELOG.md", "b\n", "chore(release): 1.1.0")
 	tr.CommitFile("src/c.go", "3", "fix: after")
 
-	err := runErr(t, tr, cfg(t, "product: image\n"), analyze.Options{Version: "1.1.0"})
+	err := runErr(t, tr, cfg(t, botAuthored), analyze.Options{Version: "1.1.0"})
 	if !errors.Is(err, analyze.ErrVersionNotHigher) {
 		t.Errorf("err = %v", err)
+	}
+}
+
+// botAuthored names the test repository's identity as the release author, so
+// the release commits it makes count as this tool's own.
+const botAuthored = "product: image\nrelease_commit:\n  author: Test Bot <test@example.invalid>\n"
+
+// AUD-030-F01: a release-shaped subject is free text. Only a commit by the
+// release identity whose version is one release step above a tagged one (or
+// an earlier accepted cut) may move the version line; anything else is
+// ignored with a warning naming it.
+func TestAForgedReleaseCommitDoesNotMoveTheVersionLine(t *testing.T) {
+	for _, c := range []struct {
+		name, author, subject, want, warn string
+	}{
+		{"a third party's 9.0.0", "Mallory <m@example.invalid>", "chore(release): 9.0.0", "1.0.1", "not authored by the release identity"},
+		{"a third party's one-step 1.1.0", "Mallory <m@example.invalid>", "chore(release): 1.1.0", "1.0.1", "not authored by the release identity"},
+		{"the bot's 9.0.0, two steps and more ahead", "Test Bot <test@example.invalid>", "chore(release): 9.0.0", "1.0.1", "is not one release step above"},
+		{"the bot's 1.0.2, two patches ahead", "Test Bot <test@example.invalid>", "chore(release): 1.0.2", "1.0.1", "is not one release step above"},
+		{"the bot's withdrawn 2.0.0, one major step", "Test Bot <test@example.invalid>", "chore(release): 2.0.0", "2.0.1", ""},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			tr := testrepo.New(t)
+			tr.CommitFile("src/a.go", "a", "feat: first")
+			tr.Tag("1.0.0")
+			tr.CommitFile("src/a.go", "b", "fix: real")
+			tr.CommitAs(c.author, "src/a.go", "c", c.subject)
+			tr.CommitFile("src/a.go", "d", "fix: another")
+
+			res := run(t, tr, cfg(t, botAuthored), analyze.Options{})
+			if res.Status != analyze.StatusRelease || res.Version.String() != c.want || res.Previous != "1.0.0" {
+				t.Fatalf("status %s, version %s, previous %s; want %s from 1.0.0", res.Status, res.Version, res.Previous, c.want)
+			}
+			warned := false
+			for _, w := range res.Warnings {
+				warned = warned || (strings.Contains(w, c.subject) && strings.Contains(w, c.warn))
+			}
+			if c.warn != "" && !warned {
+				t.Errorf("no warning naming %q (%s): %v", c.subject, c.warn, res.Warnings)
+			}
+		})
+	}
+}
+
+// Withdrawals in a row: each cut is one step above the one before, so the
+// chain counts on.
+func TestWithdrawnReleasesInARowCountOn(t *testing.T) {
+	tr := testrepo.New(t)
+	tr.CommitFile("src/a.go", "a", "feat: first")
+	tr.Tag("1.0.0")
+	tr.CommitFile("src/a.go", "b", "feat: withdrawn once")
+	tr.CommitFile("CHANGELOG.md", "b\n", "chore(release): 1.1.0")
+	tr.CommitFile("src/a.go", "c", "fix: withdrawn twice")
+	tr.CommitFile("CHANGELOG.md", "c\n", "chore(release): 1.1.1")
+	tr.CommitFile("src/a.go", "d", "fix: third time")
+
+	res := run(t, tr, cfg(t, botAuthored), analyze.Options{})
+	if res.Version.String() != "1.1.2" {
+		t.Errorf("version %s, want 1.1.2", res.Version)
+	}
+}
+
+// A first release withdrawn before any tag existed is the configured
+// initial version, and counts.
+func TestAWithdrawnFirstReleaseCounts(t *testing.T) {
+	tr := testrepo.New(t)
+	tr.CommitFile("src/a.go", "a", "feat: first")
+	tr.CommitFile("CHANGELOG.md", "a\n", "chore(release): 1.0.0")
+	tr.CommitFile("src/a.go", "b", "fix: after")
+
+	res := run(t, tr, cfg(t, botAuthored), analyze.Options{})
+	if res.Version.String() != "1.0.1" {
+		t.Errorf("version %s, want 1.0.1", res.Version)
 	}
 }
 

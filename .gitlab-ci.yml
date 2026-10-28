@@ -142,12 +142,13 @@ include:
       files: [go.sum]
     paths: [.go/pkg/mod]
   before_script:
-    # devops/images/golang carries the Go toolchain and build-base, no git.
     # yasrt's tests drive the real git binary on purpose — every rule it
     # implements is defined against git's own behaviour, so a fake would only
-    # prove the fake works. Installing it here keeps the shared image
-    # unchanged; if a second Go repository needs it, it belongs in the image.
-    - apk add --no-cache git
+    # prove the fake works. devops/images/golang carries git since it moved to
+    # openSUSE Tumbleweed (2026-10), and it has no apk any more: an
+    # unconditional `apk add` failed every job with "apk: command not found".
+    # The install stays only for an older, Wolfi-based image pin.
+    - command -v git >/dev/null || apk add --no-cache git
 
 # yasrt has no golangci-lint or govulncheck precedent in this estate to inherit;
 # both are introduced here rather than in the shared Go component, so the two
@@ -196,7 +197,7 @@ test:govulncheck:
 # its own before_script only changes directory, so both have to be restated.
 test:go:
   before_script:
-    - apk add --no-cache git
+    - command -v git >/dev/null || apk add --no-cache git
     - cd .
 
 # ---------------------------------------------------------------------------
@@ -286,7 +287,7 @@ version:
       files: [go.sum]
     paths: [.go/pkg/mod]
   script:
-    - apk add --no-cache git
+    - command -v git >/dev/null || apk add --no-cache git
     - go build -o /tmp/yasrt ./cmd/yasrt
     - /tmp/yasrt next --output .release.env
 
@@ -296,7 +297,7 @@ release:
   needs: [version, build:binaries, upload:package-registry]
   script:
     - '[ "$RELEASE_STATUS" = "release" ] || { echo "skip: ${RELEASE_STATUS:-unknown}"; exit 0; }'
-    - apk add --no-cache git
+    - command -v git >/dev/null || apk add --no-cache git
     - go build -o /tmp/yasrt ./cmd/yasrt
     - /tmp/yasrt release
 

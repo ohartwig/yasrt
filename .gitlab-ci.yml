@@ -261,7 +261,7 @@ upload:package-registry:
   # S3mail's release jobs already use this one. 8.21 is the rolling curl stream
   # tag, the same shape as devops/images/golang:1.27.
   # renovate: datasource=docker depName=registry.ole-hartwig.eu/devops/images/curl
-  image: registry.ole-hartwig.eu/devops/images/curl:8.21@sha256:2f0dbea387fc52b4ea00b69772ad5bb6f42b6923d811899802b188fca8df2054
+  image: registry.ole-hartwig.eu/devops/images/curl:8.21@sha256:6e89f73b87349944eb44ccc2bfd61071d3195346e04833b82223ae3d89c86005
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
   variables:

@@ -307,7 +307,7 @@ release:
 test:contrib:
   stage: test
   # pinup: datasource=docker depName=registry.ole-hartwig.eu/devops/images/python
-  image: registry.ole-hartwig.eu/devops/images/python:3.14@sha256:6df48dcbc13e467f80417a9f0e8b6c67dbdf17aa681e65ea6938801e3080edc8
+  image: registry.ole-hartwig.eu/devops/images/python:3.14@sha256:82b0f63b4af59ce0c9645fbc82055c0592209fee058b28e1aa8a7956d0c78c8a
   needs: []
   script:
     - python3 -m unittest discover -s contrib -v

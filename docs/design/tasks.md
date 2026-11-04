@@ -388,7 +388,7 @@ digest it produces. Two candidate designs are in `plan.md` risk R8.
 - [x] **T-175** Verdicts read on 2026-09-13: ~650 comparisons, no version disagreement; the
       differences were the comparison's own (T-172) and the deliverability window (I-081).
 - [x] **T-176** Cut-over, 2026-09-13. Wave 1a: the 13 `ci-cd-components` repositories, the two
-      proof repositories, `moselwal/dev`, `lint-tools`, `unicepta/website-2022` (3.1.0, the
+      proof repositories, `moselwal/dev`, `lint-tools`, `example-org/website-2022` (3.1.0, the
       frontend build script restored from history), `s3mail` and its ios app (1.0.0, its first
       tag ever), `buildkit-image-build`. Wave 1b: 28 consumers of the package and extension
       flavours through `release-tool: yasrt` on the bundle include. `composed-default-pipelines`

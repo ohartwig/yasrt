@@ -33,7 +33,7 @@ var forbiddenWordHashes = map[string]struct{}{
 
 // skippedDirs are paths below the repository root that are not its own text.
 var skippedDirs = map[string]struct{}{
-	".git": {}, "vendor": {}, "node_modules": {}, ".cache": {}, "dist": {}, "bin": {}, "build": {}, "coverage": {},
+	".git": {}, ".go": {}, "vendor": {}, "node_modules": {}, ".cache": {}, "dist": {}, "bin": {}, "build": {}, "coverage": {},
 }
 
 var wordPattern = regexp.MustCompile(`\p{L}{3,}`)

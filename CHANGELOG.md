@@ -1,5 +1,85 @@
 # Changelog
 
+## [1.14.6](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.14.5...v1.14.6) (2026-11-04)
+
+### :bug: Fixes
+
+* **security:** AUD-053 F01 — replace customer identifiers with placeholders ([f6a130b](https://git.ole-hartwig.eu/yasrt/cli/commit/f6a130b8aac63624c3d18d7fdfec53353946e544))
+
+### :white_check_mark: Tests
+
+* **security:** AUD-053 F01 — skip the CI Go module cache in the hygiene walk ([123e14e](https://git.ole-hartwig.eu/yasrt/cli/commit/123e14e7bdc08ab4e1bbf377d5acf7ba03aa2fd8))
+* **security:** AUD-053 F01 — add the customer-name hygiene test ([82982d0](https://git.ole-hartwig.eu/yasrt/cli/commit/82982d0776dbe37e99f70cb76384cee0bc07cba8))
+
+### :repeat: Continuous Integrations
+
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to aa2a641 ([29be822](https://git.ole-hartwig.eu/yasrt/cli/commit/29be822217d5f9f199579ad4b308a36ab2179419))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to f4bb6f9 ([f9af43a](https://git.ole-hartwig.eu/yasrt/cli/commit/f9af43a2798babd3fbea68bea0884b83ad48144f))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 81d8be8 ([0fb30b8](https://git.ole-hartwig.eu/yasrt/cli/commit/0fb30b89650eccd120556242ee1d28de77569456))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to d441708 ([0fe4ac6](https://git.ole-hartwig.eu/yasrt/cli/commit/0fe4ac6a475cad6c2d7437110e4dd48ec6fbdf25))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 1fea6c2 ([7126336](https://git.ole-hartwig.eu/yasrt/cli/commit/7126336bd52d54d03f7458eb77ba25c27a0f1127))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 34a4fc9 ([804fae1](https://git.ole-hartwig.eu/yasrt/cli/commit/804fae14835efa139406c87f787814b6543b5d25))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 01f412b ([81da00d](https://git.ole-hartwig.eu/yasrt/cli/commit/81da00d086c73e975bcf853a6a0c7ea83448300d))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 74a8cad ([561d29b](https://git.ole-hartwig.eu/yasrt/cli/commit/561d29bff03e31c12af0f3ced3d62abca3b50bd9))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 6881e81 ([add27f9](https://git.ole-hartwig.eu/yasrt/cli/commit/add27f9c2db80d1be84b52dd3c0b8bfa779069e7))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 3daec4a ([ee0ed39](https://git.ole-hartwig.eu/yasrt/cli/commit/ee0ed39f72f8b7c70256f47bd2b32e52c5cf2ba7))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 8cfb62b ([4c01bc0](https://git.ole-hartwig.eu/yasrt/cli/commit/4c01bc019ce5ea3ef9af82ab35a91cd0ab1e2cff))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to e4d03e7 ([fdd8912](https://git.ole-hartwig.eu/yasrt/cli/commit/fdd89124f85fa9a70cdb89f6932a806b3d5fc3e9))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 5333cf9 ([ba8a76e](https://git.ole-hartwig.eu/yasrt/cli/commit/ba8a76e03125d1d1c9705d8e65286a59ea56b6f1))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to d4408c2 ([0c29987](https://git.ole-hartwig.eu/yasrt/cli/commit/0c2998708ba11ef3ec6a4ba91926bf81332406da))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to b2a0d8c ([7b41d35](https://git.ole-hartwig.eu/yasrt/cli/commit/7b41d359eba36e0ae2aaeb9da4345da899bc957d))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 5f780d6 ([9410dc9](https://git.ole-hartwig.eu/yasrt/cli/commit/9410dc9918eb11e3e918525753c8d976272c57dc))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 63d4ab7 ([17cbe21](https://git.ole-hartwig.eu/yasrt/cli/commit/17cbe21e1ff894e1ca113c35687eec8e081d1d8d))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 7cb8fcc ([b422d37](https://git.ole-hartwig.eu/yasrt/cli/commit/b422d378cb6690571efff8e39fec2277090fdd45))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to c92db3c ([2966768](https://git.ole-hartwig.eu/yasrt/cli/commit/2966768e30912933d25ce5b2447c2e782f8d2f56))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 93d738f ([447898a](https://git.ole-hartwig.eu/yasrt/cli/commit/447898a981187480cdb262e1672409ada5e80cae))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 4f39ece ([714aca5](https://git.ole-hartwig.eu/yasrt/cli/commit/714aca5325b0854f8f01580803425a7671e119f8))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 3034620 ([7fd2fb0](https://git.ole-hartwig.eu/yasrt/cli/commit/7fd2fb02d2b2e149692730c88f6dd594b7d11f66))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to ec9fe03 ([ab8d590](https://git.ole-hartwig.eu/yasrt/cli/commit/ab8d590558e05e15cc3ba29cbb20ee2fca0e87d9))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to f10c6eb ([4d56676](https://git.ole-hartwig.eu/yasrt/cli/commit/4d566762abb6141c4ec89979b1275109b8f64a95))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 14871ed ([c878013](https://git.ole-hartwig.eu/yasrt/cli/commit/c8780137bb0edaad2b0e2a8d48d4d2db0d38a3da))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to d5bf777 ([0a03c92](https://git.ole-hartwig.eu/yasrt/cli/commit/0a03c9285ffac9d9915ede280c0f3cc3fef9f530))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to d41a35f ([7f22405](https://git.ole-hartwig.eu/yasrt/cli/commit/7f22405a482b576a244d429b8f2d5116c63e6684))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 86f8ef8 ([f44030a](https://git.ole-hartwig.eu/yasrt/cli/commit/f44030a793c6f00e80916f3d95b673eec1003400))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 37d6560 ([bb0fac9](https://git.ole-hartwig.eu/yasrt/cli/commit/bb0fac9305638b63ff1160afdf24f7979e0f893e))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 98e054e ([125925d](https://git.ole-hartwig.eu/yasrt/cli/commit/125925d0b58af797ad09d50d550c97563c5f35da))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to d712cb9 ([cede8a4](https://git.ole-hartwig.eu/yasrt/cli/commit/cede8a4fff19574f89699810f1a6a47b3b2ce876))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 39c0fec ([ea79cff](https://git.ole-hartwig.eu/yasrt/cli/commit/ea79cff2767a2fa67481c524cc52d995b30be9ad))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 898bb1d ([7f1d7fa](https://git.ole-hartwig.eu/yasrt/cli/commit/7f1d7fa456959725c51765a095a30d84599d1e0e))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to f8df516 ([6148211](https://git.ole-hartwig.eu/yasrt/cli/commit/6148211f5442c1eb56ff9d1f1f098a40ce88ce9b))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 5081d49 ([938739d](https://git.ole-hartwig.eu/yasrt/cli/commit/938739db38acbfb0706c8721ac71b00dcef798e3))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 0bae25c ([e538884](https://git.ole-hartwig.eu/yasrt/cli/commit/e5388846b9c3677556f453643b674639c0637822))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 78ddf0c ([bf2631b](https://git.ole-hartwig.eu/yasrt/cli/commit/bf2631b514c123282a5fa5e87233392acc141157))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to c85b326 ([b235ed7](https://git.ole-hartwig.eu/yasrt/cli/commit/b235ed724912466d5cfecd6a70d88d7b9a67f523))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to d8edff9 ([866b56e](https://git.ole-hartwig.eu/yasrt/cli/commit/866b56ef176b005fdb3544ff2a487c1719102c32))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 798476b ([8d1d1b7](https://git.ole-hartwig.eu/yasrt/cli/commit/8d1d1b730f0aada4f9fd216dd7ab4c7d571c6172))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 328c6f5 ([470ed44](https://git.ole-hartwig.eu/yasrt/cli/commit/470ed4407ef2f25fd7c48fa2c5ff9f79bcd3c383))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 0eb6a0b ([5f7627d](https://git.ole-hartwig.eu/yasrt/cli/commit/5f7627dff2991db0d024a2ab8ffe8c7599e859c6))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 47954fc ([f7792b1](https://git.ole-hartwig.eu/yasrt/cli/commit/f7792b177bd64e9ba3368e2da5be97a7a56530c8))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to d1b146e ([c893805](https://git.ole-hartwig.eu/yasrt/cli/commit/c8938057980a898dc0e55be79fc9a24492a06b70))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 433aad4 ([aaa325f](https://git.ole-hartwig.eu/yasrt/cli/commit/aaa325fdebb708eb1942ac622da21754179d43b7))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 6e89f73 ([fd1e312](https://git.ole-hartwig.eu/yasrt/cli/commit/fd1e31274f288da609fe9eac28d64dd95df57e5d))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to d1a6afe ([b1db6c5](https://git.ole-hartwig.eu/yasrt/cli/commit/b1db6c52deb415e11b39c99bb7caa8058662287a))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 2f0dbea ([3076f48](https://git.ole-hartwig.eu/yasrt/cli/commit/3076f480caff40bf11338fefc2b1609ec391f230))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 6965d88 ([6fd1f6d](https://git.ole-hartwig.eu/yasrt/cli/commit/6fd1f6d638be4f8cc3b305e2d91b68c853c5bd58))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to ef9675e ([b24d458](https://git.ole-hartwig.eu/yasrt/cli/commit/b24d4584c7a1f837ce19450a312be6bc04e30141))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 8d1c4e8 ([f0ffb09](https://git.ole-hartwig.eu/yasrt/cli/commit/f0ffb09d9cfdf1400d17ef711ce50e0d62ec655d))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 322a581 ([1d7a842](https://git.ole-hartwig.eu/yasrt/cli/commit/1d7a8423eee19c797112331337f6f2f7d30a412e))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to 14ab5ea ([2bb156c](https://git.ole-hartwig.eu/yasrt/cli/commit/2bb156ca9c32ad795c93703442316bc103583c34))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 90c2496 ([bdc8751](https://git.ole-hartwig.eu/yasrt/cli/commit/bdc87514a03fa279961c351fa92900e7decc8a53))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to b18351f ([3089457](https://git.ole-hartwig.eu/yasrt/cli/commit/30894574de30110e47d89edcabb7ed2db0b7431a))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 82b0f63 ([2671e71](https://git.ole-hartwig.eu/yasrt/cli/commit/2671e71c8475d096bde1efa63da4b9f86332303d))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to ebd4cdd ([dda221d](https://git.ole-hartwig.eu/yasrt/cli/commit/dda221db3e79761fec3b1bd4fb3e18f4ef1902ce))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 6df48dc ([417d682](https://git.ole-hartwig.eu/yasrt/cli/commit/417d68228bca85541600c422ce1968c536d1fb5f))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to bac0dc1 ([90b1a64](https://git.ole-hartwig.eu/yasrt/cli/commit/90b1a64e02ef3a2b8f211e39243941c97a76ce87))
+* **deps:** update registry.ole-hartwig.eu/devops/images/curl:8.21 docker digest to e8b6a39 ([5258050](https://git.ole-hartwig.eu/yasrt/cli/commit/5258050f840c37661c58c33270c2fa65837989c7))
+* **deps:** update registry.ole-hartwig.eu/devops/images/python:3.14 docker digest to 94c290a ([3598ba1](https://git.ole-hartwig.eu/yasrt/cli/commit/3598ba18214aaf3ca61cde411415b143cec8c630))
+
+### :repeat: Chores
+
+* **repo-templates:** sync ([64e674f](https://git.ole-hartwig.eu/yasrt/cli/commit/64e674f6b83d1fb83ec1d93f9f450f7564bf0d8e))
+* **repo-templates:** sync ([c808364](https://git.ole-hartwig.eu/yasrt/cli/commit/c8083646826ef31ab6862582d3f1b05b8fb8a948))
+
 ## [1.14.5](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.14.4...v1.14.5) (2026-10-31)
 
 ### :bug: Fixes

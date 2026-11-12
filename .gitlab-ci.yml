@@ -17,7 +17,7 @@ variables:
   # (pinup/runner!40). The tag on a variable of its own: the annotation
   # manager reads a quoted version, not an image reference.
   # pinup: datasource=docker depName=registry.ole-hartwig.eu/devops/images/golang
-  GOLANG_IMAGE_TAG: "1.27.3"
+  GOLANG_IMAGE_TAG: "1.27.4"
   # The two Go tools the pipeline runs with `go run`, pinned rather than
   # tracking "latest" (AUD-030-F05): that executes whatever the proxy serves at job
   # time, with the job's token, in the pipeline that builds the release tool

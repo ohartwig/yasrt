@@ -135,6 +135,11 @@ include:
         - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "push"
       additional-script-begin: '[ "$RELEASE_STATUS" = "release" ] || { echo "skip: ${RELEASE_STATUS:-unknown}"; exit 0; }'
 
+# The signature is made for this pipeline's upload; from here to the tag
+# nothing is cancelled (as in devops/pod-cert-signer).
+sign:artifact:dist/SHA256SUMS:
+  interruptible: false
+
 .go-base: &go-base
   image: $GO_IMAGE
   cache:
@@ -248,6 +253,9 @@ build:binaries:
 
 upload:package-registry:
   stage: build
+  # The first irreversible write before the tag: from here on, a newer
+  # commit must not cancel the pipeline before `release` has tagged.
+  interruptible: false
   # The signature where the component made one. Optional: the signing job is
   # created on main only, and exits 3 -- a warning, no file -- where the key
   # is not configured. A release without a signature is still a release; a

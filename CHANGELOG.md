@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.14.9](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.14.8...v1.14.9) (2026-11-23)
+
+### :bug: Fixes
+
+* **deps:** update module github.com/bmatcuk/doublestar/v4 to v4.10.7 ([dcc9f55](https://git.ole-hartwig.eu/yasrt/cli/commit/dcc9f550cfe9dcc13777e001cbf4bb4f42e59b0c))
+
 ## [1.14.8](https://git.ole-hartwig.eu/yasrt/cli/compare/v1.14.7...v1.14.8) (2026-11-23)
 
 ### :bug: Fixes
